@@ -63,7 +63,31 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .fillMaxSize()
         ) {
-            Text("Backend", style = MaterialTheme.typography.titleMedium)
+            Text("On-device backend", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Run backend inside this app",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        if (state.embeddedEnabled)
+                            "Running on 127.0.0.1:8090 — echo engine"
+                        else
+                            "Use a remote NullXoid backend via the Base URL below",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Switch(checked = state.embeddedEnabled, onCheckedChange = onToggleEmbedded)
+            }
+
+            Spacer(Modifier.height(24.dp))
+            Text("Remote backend", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = urlDraft,
