@@ -13,8 +13,13 @@ android {
         applicationId = "com.nullxoid.android"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = providers.gradleProperty("APP_VERSION_CODE")
+            .orElse(providers.environmentVariable("APP_VERSION_CODE"))
+            .map(String::toInt)
+            .getOrElse(1)
+        versionName = providers.gradleProperty("APP_VERSION_NAME")
+            .orElse(providers.environmentVariable("APP_VERSION_NAME"))
+            .getOrElse("0.1.0-dev")
     }
 
     buildFeatures {
