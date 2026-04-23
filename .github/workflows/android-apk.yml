@@ -11,8 +11,8 @@ permissions:
   contents: write
 
 jobs:
-  build-debug-apk:
-    name: Build debug APK
+  build-apks:
+    name: Build Android APKs
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +32,7 @@ jobs:
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug
 
-      - name: Rename APK for team download
+      - name: Rename debug APK for team download
         run: |
           mkdir -p release
           cp app/build/outputs/apk/debug/*.apk release/NullXoidAndroid-debug.apk
@@ -45,6 +45,56 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Build unsigned release APK
+        run: ./gradlew :app:assembleRelease
+
+      - name: Prepare signing key if configured
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "SIGNING_ENABLED=false" >> "$GITHUB_ENV"
+            echo "Signing secrets are not configured. Skipping signed release APK."
+            exit 0
+          fi
+
+          mkdir -p release/signing
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > release/signing/nullxoid-release-key.jks
+          echo "SIGNING_ENABLED=true" >> "$GITHUB_ENV"
+
+      - name: Sign release APK
+        if: env.SIGNING_ENABLED == 'true'
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          SIGNED_APK="release/NullXoidAndroid-signed-release.apk"
+          BUILD_TOOLS_DIR=$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -type d | sort -V | tail -n 1)
+
+          "$BUILD_TOOLS_DIR/zipalign" -p -f 4 "$UNSIGNED_APK" release/NullXoidAndroid-release-aligned.apk
+
+          "$BUILD_TOOLS_DIR/apksigner" sign \
+            --ks release/signing/nullxoid-release-key.jks \
+            --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --key-pass "pass:$ANDROID_KEY_PASSWORD" \
+            --out "$SIGNED_APK" \
+            release/NullXoidAndroid-release-aligned.apk
+
+          "$BUILD_TOOLS_DIR/apksigner" verify --verbose "$SIGNED_APK"
+
+      - name: Upload signed release APK artifact
+        if: env.SIGNING_ENABLED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NullXoidAndroid-signed-release-apk
+          path: release/NullXoidAndroid-signed-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Publish latest debug APK release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: ncipollo/release-action@v1
@@ -56,6 +106,23 @@ jobs:
 
             This is for internal app-team testing only.
           artifacts: release/NullXoidAndroid-debug.apk
+          allowUpdates: true
+          replacesArtifacts: true
+          removeArtifacts: true
+          prerelease: true
+          makeLatest: false
+
+      - name: Publish latest signed release APK
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.SIGNING_ENABLED == 'true'
+        uses: ncipollo/release-action@v1
+        with:
+          tag: latest-signed-apk
+          name: Latest Signed APK
+          body: |
+            Auto-built signed APK from the latest commit on main.
+
+            This APK is intended for app-team testing and upgrade-path testing.
+          artifacts: release/NullXoidAndroid-signed-release.apk
           allowUpdates: true
           replacesArtifacts: true
           removeArtifacts: true
