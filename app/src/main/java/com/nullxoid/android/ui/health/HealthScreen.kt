@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -37,7 +37,7 @@ fun HealthScreen(
             TopAppBar(
                 title = { Text("Runtime health") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 }
             )
         }
@@ -51,10 +51,12 @@ fun HealthScreen(
         ) {
             val h = state.health
             if (h == null) {
-                Text("Loading…", style = MaterialTheme.typography.bodyMedium)
+                Text("Loading...", style = MaterialTheme.typography.bodyMedium)
             } else {
-                Text("Backend: ${h.backend ?: "unknown"}",
-                    style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Backend: ${h.backend ?: "unknown"}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
                 h.version?.let { Text("Version: $it") }
                 Text("Status: ${if (h.ok) "OK" else "DEGRADED"}")
                 h.features?.let {

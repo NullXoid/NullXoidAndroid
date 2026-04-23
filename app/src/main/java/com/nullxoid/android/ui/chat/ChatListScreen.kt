@@ -12,9 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
@@ -57,7 +57,7 @@ fun ChatListScreen(
                     IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, null) }
                     IconButton(onClick = onOpenHealth) { Icon(Icons.Default.Favorite, "health") }
                     IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, null) }
-                    IconButton(onClick = onLogout) { Icon(Icons.Default.Logout, null) }
+                    IconButton(onClick = onLogout) { Icon(Icons.AutoMirrored.Filled.Logout, null) }
                 }
             )
         },
@@ -73,7 +73,9 @@ fun ChatListScreen(
             val active = state.chats.filter { !it.archived }
             if (active.isEmpty()) {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(

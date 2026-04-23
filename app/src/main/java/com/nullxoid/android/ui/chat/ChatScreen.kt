@@ -16,8 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -78,7 +78,7 @@ fun ChatScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 }
             )
         },
@@ -98,7 +98,7 @@ fun ChatScreen(
                             value = draft,
                             onValueChange = { draft = it },
                             modifier = Modifier.weight(1f),
-                            placeholder = { Text("Message…") },
+                            placeholder = { Text("Message...") },
                             maxLines = 6,
                             enabled = !state.streaming
                         )
@@ -113,7 +113,7 @@ fun ChatScreen(
                                     onSend(text)
                                 },
                                 enabled = draft.isNotBlank()
-                            ) { Icon(Icons.Default.Send, "send") }
+                            ) { Icon(Icons.AutoMirrored.Filled.Send, "send") }
                         }
                     }
                 }
