@@ -1,9 +1,12 @@
 package com.nullxoid.android.ui
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.nullxoid.android.BuildConfig
 import com.nullxoid.android.backend.BackendService
 import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.ChatMessage
@@ -13,6 +16,8 @@ import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.data.repo.NullXoidRepository
+import com.nullxoid.android.data.update.AppUpdateChecker
+import com.nullxoid.android.data.update.AppUpdateInfo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +38,11 @@ data class AppUiState(
     val streaming: Boolean = false,
     val streamBuffer: String = "",
     val health: HealthFeatures? = null,
-    val embeddedEnabled: Boolean = false
+    val embeddedEnabled: Boolean = false,
+    val updateInfo: AppUpdateInfo? = null,
+    val checkingUpdate: Boolean = false,
+    val currentAppVersionName: String = BuildConfig.VERSION_NAME,
+    val currentAppVersionCode: Int = BuildConfig.VERSION_CODE
 )
 
 class NullXoidViewModel(
@@ -208,6 +217,48 @@ class NullXoidViewModel(
 
     fun clearError() {
         _state.value = _state.value.copy(error = null)
+    }
+
+    fun checkForUpdate() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(checkingUpdate = true, error = null)
+            runCatching { AppUpdateChecker().checkLatestDebugRelease() }
+                .onSuccess { info ->
+                    _state.value = _state.value.copy(checkingUpdate = false, updateInfo = info)
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        checkingUpdate = false,
+                        error = t.message ?: "Update check failed"
+                    )
+                }
+        }
+    }
+
+    fun openUpdateReleasePage() {
+        openExternalUrl(
+            _state.value.updateInfo?.releasePageUrl
+                ?: "https://github.com/NullXoid/NullXoidAndroid/releases/tag/latest-debug"
+        )
+    }
+
+    fun openDirectApkDownload() {
+        val url = _state.value.updateInfo?.apkDownloadUrl
+        if (url.isNullOrBlank()) {
+            _state.value = _state.value.copy(error = "No APK download link found. Run update check first.")
+            return
+        }
+        openExternalUrl(url)
+    }
+
+    private fun openExternalUrl(url: String) {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runCatching { appContext.startActivity(intent) }
+            .onFailure { t ->
+                _state.value = _state.value.copy(error = t.message ?: "Could not open link")
+            }
     }
 
     fun setEmbeddedBackend(enabled: Boolean) {
