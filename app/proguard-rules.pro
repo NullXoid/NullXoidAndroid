@@ -1,0 +1,5 @@
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keep,includedescriptorclasses class com.nullxoid.android.**$$serializer { *; }
+-keepclassmembers class com.nullxoid.android.** { *** Companion; }
+-keepclasseswithmembers class com.nullxoid.android.** { kotlinx.serialization.KSerializer serializer(...); }

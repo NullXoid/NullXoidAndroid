@@ -1,0 +1,266 @@
+package com.nullxoid.android.ui
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.nullxoid.android.backend.BackendService
+import com.nullxoid.android.data.model.AuthState
+import com.nullxoid.android.data.model.ChatMessage
+import com.nullxoid.android.data.model.ChatRecord
+import com.nullxoid.android.data.model.HealthFeatures
+import com.nullxoid.android.data.model.ModelDescriptor
+import com.nullxoid.android.data.model.StreamEvent
+import com.nullxoid.android.data.prefs.SettingsStore
+import com.nullxoid.android.data.repo.NullXoidRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+
+data class AppUiState(
+    val auth: AuthState = AuthState(),
+    val loading: Boolean = false,
+    val error: String? = null,
+    val backendUrl: String = "",
+    val models: List<ModelDescriptor> = emptyList(),
+    val selectedModel: String? = null,
+    val chats: List<ChatRecord> = emptyList(),
+    val activeChat: ChatRecord? = null,
+    val activeMessages: List<ChatMessage> = emptyList(),
+    val streaming: Boolean = false,
+    val streamBuffer: String = "",
+    val health: HealthFeatures? = null,
+    val embeddedEnabled: Boolean = false
+)
+
+class NullXoidViewModel(
+    private val repo: NullXoidRepository,
+    private val appContext: Context,
+    private val settingsStore: SettingsStore
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(AppUiState())
+    val state: StateFlow<AppUiState> = _state.asStateFlow()
+
+    private var streamJob: Job? = null
+
+    fun bootstrap() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null)
+            val url = runCatching { repo.backendUrl.first() }.getOrDefault("")
+            val embedded = runCatching { settingsStore.embeddedEnabled.first() }.getOrDefault(false)
+            if (embedded) ensureBackendRunning()
+            val auth = runCatching { repo.bootstrap() }.getOrElse { AuthState() }
+            _state.value = _state.value.copy(
+                loading = false,
+                embeddedEnabled = embedded,
+                auth = auth,
+                backendUrl = url,
+                selectedModel = repo.selectedModel()
+            )
+            if (auth.authenticated) refreshPostLogin()
+        }
+    }
+
+    fun setBackendUrl(url: String) {
+        viewModelScope.launch {
+            repo.setBackendUrl(url)
+            _state.value = _state.value.copy(backendUrl = url)
+        }
+    }
+
+    fun login(username: String, password: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null)
+            runCatching { repo.login(username, password) }
+                .onSuccess { auth ->
+                    _state.value = _state.value.copy(loading = false, auth = auth)
+                    refreshPostLogin()
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(loading = false, error = t.message)
+                }
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            streamJob?.cancel()
+            repo.logout()
+            _state.value = AppUiState(backendUrl = _state.value.backendUrl)
+        }
+    }
+
+    fun refreshChats() {
+        viewModelScope.launch {
+            runCatching { repo.chats() }
+                .onSuccess { _state.value = _state.value.copy(chats = it) }
+                .onFailure { t -> _state.value = _state.value.copy(error = t.message) }
+        }
+    }
+
+    fun refreshModels() {
+        viewModelScope.launch {
+            runCatching { repo.models() }
+                .onSuccess { list ->
+                    _state.value = _state.value.copy(
+                        models = list,
+                        selectedModel = _state.value.selectedModel ?: list.firstOrNull()?.id
+                    )
+                }
+                .onFailure { t -> _state.value = _state.value.copy(error = t.message) }
+        }
+    }
+
+    fun refreshHealth() {
+        viewModelScope.launch {
+            runCatching { repo.health() }
+                .onSuccess { _state.value = _state.value.copy(health = it) }
+                .onFailure { t -> _state.value = _state.value.copy(error = t.message) }
+        }
+    }
+
+    fun selectModel(modelId: String) {
+        viewModelScope.launch {
+            repo.setSelectedModel(modelId)
+            _state.value = _state.value.copy(selectedModel = modelId)
+        }
+    }
+
+    fun openChat(chat: ChatRecord) {
+        val messages = chat.session?.messages.orEmpty()
+        _state.value = _state.value.copy(
+            activeChat = chat,
+            activeMessages = messages,
+            streamBuffer = ""
+        )
+    }
+
+    fun startNewChat() {
+        _state.value = _state.value.copy(
+            activeChat = null,
+            activeMessages = emptyList(),
+            streamBuffer = ""
+        )
+    }
+
+    fun sendMessage(text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        val model = _state.value.selectedModel ?: run {
+            _state.value = _state.value.copy(error = "Select a model first")
+            return
+        }
+        val userMsg = ChatMessage(role = "user", content = trimmed)
+        val nextHistory = _state.value.activeMessages + userMsg
+        _state.value = _state.value.copy(
+            activeMessages = nextHistory,
+            streaming = true,
+            streamBuffer = "",
+            error = null
+        )
+        streamJob?.cancel()
+        streamJob = viewModelScope.launch {
+            val acc = StringBuilder()
+            runCatching {
+                repo.streamReply(
+                    model = model,
+                    messages = nextHistory,
+                    chatId = _state.value.activeChat?.id
+                ).collect { evt ->
+                    when (evt) {
+                        is StreamEvent.Delta -> {
+                            acc.append(evt.text)
+                            _state.value = _state.value.copy(streamBuffer = acc.toString())
+                        }
+                        is StreamEvent.Error -> {
+                            _state.value = _state.value.copy(
+                                streaming = false,
+                                error = evt.message
+                            )
+                        }
+                        StreamEvent.Completed -> {
+                            val finalText = acc.toString()
+                            val updated = _state.value.activeMessages +
+                                ChatMessage(role = "assistant", content = finalText)
+                            _state.value = _state.value.copy(
+                                streaming = false,
+                                activeMessages = updated,
+                                streamBuffer = ""
+                            )
+                        }
+                        else -> Unit
+                    }
+                }
+            }.onFailure { t ->
+                _state.value = _state.value.copy(streaming = false, error = t.message)
+            }
+        }
+    }
+
+    fun cancelStream() {
+        streamJob?.cancel()
+        _state.value = _state.value.copy(streaming = false)
+    }
+
+    fun clearError() {
+        _state.value = _state.value.copy(error = null)
+    }
+
+    fun setEmbeddedBackend(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsStore.setEmbeddedEnabled(enabled)
+            _state.value = _state.value.copy(embeddedEnabled = enabled)
+            if (enabled) {
+                ensureBackendRunning()
+                val newUrl = SettingsStore.EMBEDDED_BACKEND_URL
+                repo.setBackendUrl(newUrl)
+                _state.value = _state.value.copy(backendUrl = newUrl)
+                runCatching { repo.bootstrap() }.onSuccess { auth ->
+                    _state.value = _state.value.copy(auth = auth)
+                    if (auth.authenticated) refreshPostLogin()
+                }
+            } else {
+                stopBackend()
+            }
+        }
+    }
+
+    private fun ensureBackendRunning() {
+        val intent = android.content.Intent(appContext, BackendService::class.java)
+        androidx.core.content.ContextCompat.startForegroundService(appContext, intent)
+    }
+
+    private fun stopBackend() {
+        val intent = android.content.Intent(appContext, BackendService::class.java)
+        appContext.stopService(intent)
+    }
+
+    private suspend fun refreshPostLogin() {
+        runCatching { repo.models() }.onSuccess { list ->
+            _state.value = _state.value.copy(
+                models = list,
+                selectedModel = _state.value.selectedModel ?: list.firstOrNull()?.id
+            )
+        }
+        runCatching { repo.chats() }.onSuccess { chats ->
+            _state.value = _state.value.copy(chats = chats)
+        }
+        runCatching { repo.health() }.onSuccess { health ->
+            _state.value = _state.value.copy(health = health)
+        }
+    }
+
+    class Factory(
+        private val repo: NullXoidRepository,
+        private val appContext: Context,
+        private val settingsStore: SettingsStore
+    ) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+            NullXoidViewModel(repo, appContext, settingsStore) as T
+    }
+}
