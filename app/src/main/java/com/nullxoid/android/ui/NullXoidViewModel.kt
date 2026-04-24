@@ -18,6 +18,7 @@ import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.data.repo.NullXoidRepository
 import com.nullxoid.android.data.update.AppUpdateChecker
 import com.nullxoid.android.data.update.AppUpdateInfo
+import com.nullxoid.android.data.update.AppUpdateInstaller
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +42,7 @@ data class AppUiState(
     val embeddedEnabled: Boolean = false,
     val updateInfo: AppUpdateInfo? = null,
     val checkingUpdate: Boolean = false,
+    val installingUpdate: Boolean = false,
     val currentAppVersionName: String = BuildConfig.VERSION_NAME,
     val currentAppVersionCode: Int = BuildConfig.VERSION_CODE
 )
@@ -242,13 +244,28 @@ class NullXoidViewModel(
         )
     }
 
-    fun openDirectApkDownload() {
+    fun installLatestUpdate() {
         val url = _state.value.updateInfo?.apkDownloadUrl
         if (url.isNullOrBlank()) {
             _state.value = _state.value.copy(error = "No APK download link found. Run update check first.")
             return
         }
-        openExternalUrl(url)
+        viewModelScope.launch {
+            _state.value = _state.value.copy(installingUpdate = true, error = null)
+            runCatching { AppUpdateInstaller(appContext).downloadAndInstall(url) }
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(
+                        installingUpdate = false,
+                        error = result.message
+                    )
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        installingUpdate = false,
+                        error = t.message ?: "Could not install update"
+                    )
+                }
+        }
     }
 
     private fun openExternalUrl(url: String) {

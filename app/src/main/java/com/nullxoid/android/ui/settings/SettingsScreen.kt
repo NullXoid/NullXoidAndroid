@@ -46,7 +46,7 @@ fun SettingsScreen(
     onToggleEmbedded: (Boolean) -> Unit,
     onCheckForUpdate: () -> Unit,
     onOpenUpdateReleasePage: () -> Unit,
-    onOpenDirectApkDownload: () -> Unit
+    onInstallUpdate: () -> Unit
 ) {
     var urlDraft by remember(state.backendUrl) { mutableStateOf(state.backendUrl) }
 
@@ -134,11 +134,12 @@ fun SettingsScreen(
             Spacer(Modifier.height(24.dp))
             Text("App update", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
+            val updateInfo = state.updateInfo
             Text(
                 "Installed: ${state.currentAppVersionName} (${state.currentAppVersionCode})",
                 style = MaterialTheme.typography.bodySmall
             )
-            state.updateInfo?.let { info ->
+            updateInfo?.let { info ->
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Latest: ${info.latestReleaseName}",
@@ -160,7 +161,7 @@ fun SettingsScreen(
             ) {
                 Button(
                     onClick = onCheckForUpdate,
-                    enabled = !state.checkingUpdate
+                    enabled = !state.checkingUpdate && !state.installingUpdate
                 ) {
                     Text(if (state.checkingUpdate) "Checking" else "Check")
                 }
@@ -168,10 +169,12 @@ fun SettingsScreen(
                     Text("Release")
                 }
                 OutlinedButton(
-                    onClick = onOpenDirectApkDownload,
-                    enabled = state.updateInfo?.apkDownloadUrl != null
+                    onClick = onInstallUpdate,
+                    enabled = updateInfo?.updateAvailable == true &&
+                        updateInfo.apkDownloadUrl != null &&
+                        !state.installingUpdate
                 ) {
-                    Text("APK")
+                    Text(if (state.installingUpdate) "Installing" else "Install")
                 }
             }
         }

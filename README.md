@@ -11,7 +11,7 @@ Android frontend for NullXoid, built with Kotlin, Jetpack Compose, and Gradle.
 - Health screen for backend/runtime status
 - Settings screen with configurable backend base URL
 - Experimental embedded on-device backend scaffold for local streaming development
-- In-app debug APK update check backed by GitHub prereleases
+- In-app debug APK update check, download, and installer handoff backed by GitHub prereleases
 
 This repository is intended to stay aligned with the current NullXoid backend contract rather than introducing Android-specific API drift.
 
@@ -40,6 +40,8 @@ From the repository root:
 The debug APK will be produced under `app/build/outputs/apk/debug/`.
 
 Pushes to `main` also run the GitHub Actions APK workflow and publish prerelease debug APK artifacts under both a versioned tag and `latest-debug`.
+
+The app can check for a newer prerelease from Settings, download the APK, and launch Android's package installer. Android still requires the user to approve the install prompt and allow installs from this app when sideloading is not already enabled.
 
 ## Run
 
