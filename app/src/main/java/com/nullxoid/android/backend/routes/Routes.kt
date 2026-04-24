@@ -11,6 +11,7 @@ import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.ModelListResponse
 import com.nullxoid.android.data.model.RemoteSettings
 import com.nullxoid.android.backend.engine.LlmEngine
+import com.nullxoid.android.backend.nullbridge.NullBridgeAdapter
 import com.nullxoid.android.backend.store.EmbeddedStore
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -38,6 +39,7 @@ fun Route.nullxoidRoutes(store: EmbeddedStore, engine: LlmEngine) {
     authRoutes(store)
     healthRoutes(engine)
     aibenchieRoutes()
+    nullBridgeRoutes()
     modelRoutes(engine)
     settingsRoutes(engine)
     chatRoutes(store)
@@ -90,6 +92,29 @@ private fun Route.aibenchieRoutes() {
                 put("message", "Hello from NullXoid Android embedded backend.")
             }
         )
+    }
+}
+
+private fun Route.nullBridgeRoutes(adapter: NullBridgeAdapter = NullBridgeAdapter()) {
+    get("/api/nullbridge/status") {
+        call.respond(adapter.status())
+    }
+
+    post("/api/nullbridge/route-check") {
+        val body = call.receive<JsonObject>()
+        val capability = body["capability"]?.toString()?.trim('"').orEmpty()
+        val targetRole = body["targetRole"]?.toString()?.trim('"').orEmpty()
+        val targetId = body["targetId"]?.toString()?.trim('"')?.takeIf { it.isNotBlank() }
+        val payload = body["payload"] as? JsonObject ?: buildJsonObject {}
+        if (capability.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("detail", "capability is required") })
+            return@post
+        }
+        if (targetRole.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("detail", "targetRole is required") })
+            return@post
+        }
+        call.respond(adapter.routeCheck(capability, targetRole, targetId, payload))
     }
 }
 
