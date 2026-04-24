@@ -29,6 +29,13 @@ You can change the backend URL from the in-app Settings screen.
 
 For physical devices, replace the default with a reachable LAN or tunnel URL for the backend.
 
+Embedded backend mode runs a local Ktor server inside the Android app on `http://127.0.0.1:8090`. The embedded engine can be set to:
+
+- `Echo`: deterministic local streaming for smoke testing with no model dependency.
+- `Ollama`: relays embedded backend chat streams to an Ollama server using the configured Ollama URL and model.
+
+For an emulator talking to Ollama on the host, use `http://10.0.2.2:11434`. For a physical device, Ollama must be reachable over LAN or tunnel, and the host must allow non-local connections.
+
 ## Build
 
 From the repository root:

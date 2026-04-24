@@ -43,6 +43,9 @@ data class AppUiState(
     val streamBuffer: String = "",
     val health: HealthFeatures? = null,
     val embeddedEnabled: Boolean = false,
+    val embeddedEngine: String = SettingsStore.EMBEDDED_ENGINE_ECHO,
+    val ollamaUrl: String = SettingsStore.DEFAULT_OLLAMA_URL,
+    val ollamaModel: String = SettingsStore.DEFAULT_OLLAMA_MODEL,
     val updateInfo: AppUpdateInfo? = null,
     val checkingUpdate: Boolean = false,
     val installingUpdate: Boolean = false,
@@ -68,11 +71,20 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(loading = true, error = null)
             val url = runCatching { repo.backendUrl.first() }.getOrDefault("")
             val embedded = runCatching { settingsStore.embeddedEnabled.first() }.getOrDefault(false)
+            val embeddedEngine = runCatching { settingsStore.embeddedEngine.first() }
+                .getOrDefault(SettingsStore.EMBEDDED_ENGINE_ECHO)
+            val ollamaUrl = runCatching { settingsStore.ollamaUrl.first() }
+                .getOrDefault(SettingsStore.DEFAULT_OLLAMA_URL)
+            val ollamaModel = runCatching { settingsStore.ollamaModel.first() }
+                .getOrDefault(SettingsStore.DEFAULT_OLLAMA_MODEL)
             if (embedded) ensureBackendRunning()
             val auth = runCatching { repo.bootstrap() }.getOrElse { AuthState() }
             _state.value = _state.value.copy(
                 loading = false,
                 embeddedEnabled = embedded,
+                embeddedEngine = embeddedEngine,
+                ollamaUrl = ollamaUrl,
+                ollamaModel = ollamaModel,
                 auth = auth,
                 backendUrl = url,
                 selectedModel = repo.selectedModel()
@@ -338,6 +350,28 @@ class NullXoidViewModel(
         }
     }
 
+    fun setEmbeddedEngine(engine: String) {
+        viewModelScope.launch {
+            settingsStore.setEmbeddedEngine(engine)
+            _state.value = _state.value.copy(embeddedEngine = engine)
+            restartEmbeddedBackendIfNeeded()
+        }
+    }
+
+    fun setOllamaSettings(baseUrl: String, model: String) {
+        viewModelScope.launch {
+            val cleanUrl = baseUrl.trim().ifBlank { SettingsStore.DEFAULT_OLLAMA_URL }
+            val cleanModel = model.trim().ifBlank { SettingsStore.DEFAULT_OLLAMA_MODEL }
+            settingsStore.setOllamaUrl(cleanUrl)
+            settingsStore.setOllamaModel(cleanModel)
+            _state.value = _state.value.copy(
+                ollamaUrl = cleanUrl,
+                ollamaModel = cleanModel
+            )
+            restartEmbeddedBackendIfNeeded()
+        }
+    }
+
     private fun ensureBackendRunning() {
         val intent = android.content.Intent(appContext, BackendService::class.java)
         androidx.core.content.ContextCompat.startForegroundService(appContext, intent)
@@ -346,6 +380,14 @@ class NullXoidViewModel(
     private fun stopBackend() {
         val intent = android.content.Intent(appContext, BackendService::class.java)
         appContext.stopService(intent)
+    }
+
+    private fun restartEmbeddedBackendIfNeeded() {
+        if (!_state.value.embeddedEnabled) return
+        stopBackend()
+        ensureBackendRunning()
+        refreshModels()
+        refreshHealth()
     }
 
     private suspend fun refreshPostLogin() {

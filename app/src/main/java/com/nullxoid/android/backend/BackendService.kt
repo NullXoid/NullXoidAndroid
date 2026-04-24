@@ -6,24 +6,41 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import com.nullxoid.android.backend.engine.EchoEngine
+import com.nullxoid.android.backend.engine.LlmEngine
+import com.nullxoid.android.backend.engine.OllamaEngine
+import com.nullxoid.android.data.prefs.SettingsStore
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 class BackendService : Service() {
     private var server: EmbeddedServer? = null
     private var started = false
+    private lateinit var settingsStore: SettingsStore
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        server = EmbeddedServer(port = DEFAULT_PORT)
+        settingsStore = SettingsStore(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, buildNotification())
         if (!started) {
-            server?.start()
+            server = EmbeddedServer(port = DEFAULT_PORT, engine = buildEngine()).also { it.start() }
             started = true
         }
         return START_STICKY
+    }
+
+    private fun buildEngine(): LlmEngine = runBlocking {
+        when (settingsStore.embeddedEngine.first()) {
+            SettingsStore.EMBEDDED_ENGINE_OLLAMA -> OllamaEngine(
+                baseUrl = settingsStore.ollamaUrl.first(),
+                model = settingsStore.ollamaModel.first()
+            )
+            else -> EchoEngine()
+        }
     }
 
     override fun onDestroy() {

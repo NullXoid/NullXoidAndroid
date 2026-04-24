@@ -104,6 +104,8 @@ fun NullXoidApp(app: NullXoidApplication) {
                         onSelectModel = vm::selectModel,
                         onRefreshModels = vm::refreshModels,
                         onToggleEmbedded = vm::setEmbeddedBackend,
+                        onSelectEmbeddedEngine = vm::setEmbeddedEngine,
+                        onSaveOllamaSettings = vm::setOllamaSettings,
                         onCheckForUpdate = vm::checkForUpdate,
                         onOpenUpdateReleasePage = vm::openUpdateReleasePage,
                         onInstallUpdate = vm::installLatestUpdate

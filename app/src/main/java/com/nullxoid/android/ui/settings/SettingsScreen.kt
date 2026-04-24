@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.ui.AppUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,11 +45,15 @@ fun SettingsScreen(
     onSelectModel: (String) -> Unit,
     onRefreshModels: () -> Unit,
     onToggleEmbedded: (Boolean) -> Unit,
+    onSelectEmbeddedEngine: (String) -> Unit,
+    onSaveOllamaSettings: (String, String) -> Unit,
     onCheckForUpdate: () -> Unit,
     onOpenUpdateReleasePage: () -> Unit,
     onInstallUpdate: () -> Unit
 ) {
     var urlDraft by remember(state.backendUrl) { mutableStateOf(state.backendUrl) }
+    var ollamaUrlDraft by remember(state.ollamaUrl) { mutableStateOf(state.ollamaUrl) }
+    var ollamaModelDraft by remember(state.ollamaModel) { mutableStateOf(state.ollamaModel) }
 
     Scaffold(
         topBar = {
@@ -88,6 +93,41 @@ fun SettingsScreen(
                     )
                 }
                 Switch(checked = state.embeddedEnabled, onCheckedChange = onToggleEmbedded)
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_ECHO,
+                    onClick = { onSelectEmbeddedEngine(SettingsStore.EMBEDDED_ENGINE_ECHO) },
+                    label = { Text("Echo") }
+                )
+                FilterChip(
+                    selected = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_OLLAMA,
+                    onClick = { onSelectEmbeddedEngine(SettingsStore.EMBEDDED_ENGINE_OLLAMA) },
+                    label = { Text("Ollama") }
+                )
+            }
+            if (state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_OLLAMA) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = ollamaUrlDraft,
+                    onValueChange = { ollamaUrlDraft = it },
+                    label = { Text("Ollama URL") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = ollamaModelDraft,
+                    onValueChange = { ollamaModelDraft = it },
+                    label = { Text("Ollama model") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { onSaveOllamaSettings(ollamaUrlDraft, ollamaModelDraft) }) {
+                    Text("Save Ollama")
+                }
             }
 
             Spacer(Modifier.height(24.dp))

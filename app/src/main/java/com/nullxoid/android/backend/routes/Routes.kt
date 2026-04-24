@@ -36,7 +36,7 @@ import kotlinx.serialization.json.put
  */
 fun Route.nullxoidRoutes(store: InMemoryStore, engine: LlmEngine) {
     authRoutes(store)
-    healthRoutes()
+    healthRoutes(engine)
     modelRoutes(engine)
     settingsRoutes(engine)
     chatRoutes(store)
@@ -57,7 +57,7 @@ private fun Route.authRoutes(store: InMemoryStore) {
     }
 }
 
-private fun Route.healthRoutes() {
+private fun Route.healthRoutes(engine: LlmEngine) {
     get("/health/features") {
         call.respond(
             HealthFeatures(
@@ -70,7 +70,8 @@ private fun Route.healthRoutes() {
                     put("workspaces", false)
                 },
                 runtime = buildJsonObject {
-                    put("engine", "EchoEngine")
+                    put("engine", engine.id)
+                    put("engine_name", engine.displayName)
                     put("device_local", true)
                 }
             )
@@ -86,8 +87,8 @@ private fun Route.modelRoutes(engine: LlmEngine) {
                     ModelDescriptor(
                         id = engine.id,
                         name = engine.displayName,
-                        provider = "on-device",
-                        family = "echo",
+                        provider = if (engine.id.startsWith("ollama:")) "ollama" else "on-device",
+                        family = if (engine.id.startsWith("ollama:")) "ollama" else "echo",
                         contextWindow = 4096,
                         capabilities = listOf("chat", "streaming")
                     )
