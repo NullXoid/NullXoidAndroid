@@ -37,6 +37,7 @@ import kotlinx.serialization.json.put
 fun Route.nullxoidRoutes(store: EmbeddedStore, engine: LlmEngine) {
     authRoutes(store)
     healthRoutes(engine)
+    aibenchieRoutes()
     modelRoutes(engine)
     settingsRoutes(engine)
     chatRoutes(store)
@@ -75,6 +76,19 @@ private fun Route.healthRoutes(engine: LlmEngine) {
                     put("device_local", true)
                 }
             )
+        )
+    }
+}
+
+private fun Route.aibenchieRoutes() {
+    get("/api/aibenchie/greeting") {
+        call.respond(
+            buildJsonObject {
+                put("ok", true)
+                put("backend", "nullxoid-android-embedded")
+                put("contract", "aibenchie.frontend-backend.v1")
+                put("message", "Hello from NullXoid Android embedded backend.")
+            }
         )
     }
 }
