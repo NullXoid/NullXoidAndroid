@@ -1,7 +1,11 @@
 package com.nullxoid.android.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -112,6 +116,33 @@ fun NullXoidApp(app: NullXoidApplication) {
                         onRefresh = vm::refreshHealth
                     )
                 }
+            }
+
+            val updateInfo = state.updateInfo
+            if (updateInfo?.updateAvailable == true && !state.updatePromptDismissed) {
+                AlertDialog(
+                    onDismissRequest = vm::dismissUpdatePrompt,
+                    title = { Text("Update available") },
+                    text = {
+                        Text(
+                            "NullXoidAndroid ${updateInfo.latestReleaseName} is ready. " +
+                                "You can install it now or do it later."
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = vm::installLatestUpdate,
+                            enabled = !state.installingUpdate && updateInfo.apkDownloadUrl != null
+                        ) {
+                            Text(if (state.installingUpdate) "Installing" else "Update")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = vm::dismissUpdatePrompt) {
+                            Text("Later")
+                        }
+                    }
+                )
             }
         }
     }

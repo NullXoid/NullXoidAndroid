@@ -16,6 +16,7 @@ data class AppUpdateInfo(
     val currentVersionName: String,
     val currentVersionCode: Int,
     val latestReleaseName: String,
+    val versionCode: Int,
     val releasePageUrl: String,
     val apkDownloadUrl: String?,
     val updateAvailable: Boolean
@@ -45,6 +46,7 @@ class AppUpdateChecker(
                 currentVersionName = BuildConfig.VERSION_NAME,
                 currentVersionCode = BuildConfig.VERSION_CODE,
                 latestReleaseName = latest.displayName,
+                versionCode = latest.versionCode,
                 releasePageUrl = latest.releasePageUrl,
                 apkDownloadUrl = latest.apkDownloadUrl,
                 updateAvailable = latest.versionCode > BuildConfig.VERSION_CODE

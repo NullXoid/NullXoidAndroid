@@ -19,6 +19,7 @@ import com.nullxoid.android.data.repo.NullXoidRepository
 import com.nullxoid.android.data.update.AppUpdateChecker
 import com.nullxoid.android.data.update.AppUpdateInfo
 import com.nullxoid.android.data.update.AppUpdateInstaller
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +44,7 @@ data class AppUiState(
     val updateInfo: AppUpdateInfo? = null,
     val checkingUpdate: Boolean = false,
     val installingUpdate: Boolean = false,
+    val updatePromptDismissed: Boolean = false,
     val currentAppVersionName: String = BuildConfig.VERSION_NAME,
     val currentAppVersionCode: Int = BuildConfig.VERSION_CODE
 )
@@ -57,6 +59,7 @@ class NullXoidViewModel(
     val state: StateFlow<AppUiState> = _state.asStateFlow()
 
     private var streamJob: Job? = null
+    private var updateCheckJob: Job? = null
 
     fun bootstrap() {
         viewModelScope.launch {
@@ -73,6 +76,8 @@ class NullXoidViewModel(
                 selectedModel = repo.selectedModel()
             )
             if (auth.authenticated) refreshPostLogin()
+            checkForUpdateSilently()
+            startPeriodicUpdateChecks()
         }
     }
 
@@ -222,19 +227,53 @@ class NullXoidViewModel(
     }
 
     fun checkForUpdate() {
+        checkForUpdate(showErrors = true)
+    }
+
+    private fun checkForUpdateSilently() {
+        checkForUpdate(showErrors = false)
+    }
+
+    private fun startPeriodicUpdateChecks() {
+        if (updateCheckJob != null) return
+        updateCheckJob = viewModelScope.launch {
+            while (true) {
+                delay(30 * 60 * 1000L)
+                checkForUpdateSilently()
+            }
+        }
+    }
+
+    private fun checkForUpdate(showErrors: Boolean) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(checkingUpdate = true, error = null)
+            _state.value = _state.value.copy(
+                checkingUpdate = showErrors,
+                error = if (showErrors) null else _state.value.error
+            )
             runCatching { AppUpdateChecker().checkLatestDebugRelease() }
                 .onSuccess { info ->
-                    _state.value = _state.value.copy(checkingUpdate = false, updateInfo = info)
+                    val shouldResetPrompt =
+                        info.updateAvailable &&
+                            info.versionCode != _state.value.updateInfo?.versionCode
+                    _state.value = _state.value.copy(
+                        checkingUpdate = false,
+                        updateInfo = info,
+                        updatePromptDismissed = if (shouldResetPrompt) false
+                            else _state.value.updatePromptDismissed
+                    )
                 }
                 .onFailure { t ->
                     _state.value = _state.value.copy(
                         checkingUpdate = false,
-                        error = t.message ?: "Update check failed"
+                        error = if (showErrors) t.message ?: "Update check failed"
+                            else _state.value.error
                     )
                 }
         }
+    }
+
+    fun dismissUpdatePrompt() {
+        _state.value = _state.value.copy(updatePromptDismissed = true)
     }
 
     fun openUpdateReleasePage() {
