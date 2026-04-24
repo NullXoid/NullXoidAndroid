@@ -99,7 +99,10 @@ fun NullXoidApp(app: NullXoidApplication) {
                         onSave = vm::setBackendUrl,
                         onSelectModel = vm::selectModel,
                         onRefreshModels = vm::refreshModels,
-                        onToggleEmbedded = vm::setEmbeddedBackend
+                        onToggleEmbedded = vm::setEmbeddedBackend,
+                        onCheckForUpdate = vm::checkForUpdate,
+                        onOpenUpdateReleasePage = vm::openUpdateReleasePage,
+                        onOpenDirectApkDownload = vm::openDirectApkDownload
                     )
                 }
                 composable(Routes.Health) {
