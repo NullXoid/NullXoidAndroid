@@ -41,7 +41,7 @@ The debug APK will be produced under `app/build/outputs/apk/debug/`.
 
 Pushes to `main` also run the GitHub Actions APK workflow and publish prerelease debug APK artifacts under both a versioned tag and `latest-debug`.
 
-The app checks for newer prereleases at startup and periodically while running. When an update is available, it shows an in-app prompt with Update and Later actions. Update downloads the APK and launches Android's package installer; Android still requires the user to approve the install prompt and allow installs from this app when sideloading is not already enabled.
+The app checks for newer prereleases at startup, every six hours while running, and whenever the user taps Check in Settings. When an update is available, it shows an in-app prompt with Update and Later actions. Update downloads the APK and launches Android's package installer; Android still requires the user to approve the install prompt and allow installs from this app when sideloading is not already enabled.
 
 ## Run
 

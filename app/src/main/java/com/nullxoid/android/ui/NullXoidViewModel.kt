@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
+
 data class AppUiState(
     val auth: AuthState = AuthState(),
     val loading: Boolean = false,
@@ -238,7 +240,7 @@ class NullXoidViewModel(
         if (updateCheckJob != null) return
         updateCheckJob = viewModelScope.launch {
             while (true) {
-                delay(30 * 60 * 1000L)
+                delay(UPDATE_CHECK_INTERVAL_MS)
                 checkForUpdateSilently()
             }
         }
