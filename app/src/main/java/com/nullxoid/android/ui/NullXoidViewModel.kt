@@ -11,6 +11,7 @@ import com.nullxoid.android.backend.BackendService
 import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.ChatMessage
 import com.nullxoid.android.data.model.ChatRecord
+import com.nullxoid.android.data.model.ChatSession
 import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.StreamEvent
@@ -196,10 +197,21 @@ class NullXoidViewModel(
         streamJob = viewModelScope.launch {
             val acc = StringBuilder()
             runCatching {
+                val chatId = _state.value.activeChat?.id ?: run {
+                    val created = repo.createChat(
+                        title = trimmed.take(60),
+                        messages = nextHistory
+                    )
+                    _state.value = _state.value.copy(
+                        activeChat = created,
+                        chats = listOf(created) + _state.value.chats.filterNot { it.id == created.id }
+                    )
+                    created.id
+                }
                 repo.streamReply(
                     model = model,
                     messages = nextHistory,
-                    chatId = _state.value.activeChat?.id
+                    chatId = chatId
                 ).collect { evt ->
                     when (evt) {
                         is StreamEvent.Delta -> {
@@ -219,8 +231,12 @@ class NullXoidViewModel(
                             _state.value = _state.value.copy(
                                 streaming = false,
                                 activeMessages = updated,
+                                activeChat = _state.value.activeChat?.copy(
+                                    session = ChatSession(messages = updated)
+                                ),
                                 streamBuffer = ""
                             )
+                            refreshChats()
                         }
                         else -> Unit
                     }

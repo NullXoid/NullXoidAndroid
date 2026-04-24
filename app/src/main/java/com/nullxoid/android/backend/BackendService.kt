@@ -27,7 +27,11 @@ class BackendService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, buildNotification())
         if (!started) {
-            server = EmbeddedServer(port = DEFAULT_PORT, engine = buildEngine()).also { it.start() }
+            server = EmbeddedServer(
+                context = this,
+                port = DEFAULT_PORT,
+                engine = buildEngine()
+            ).also { it.start() }
             started = true
         }
         return START_STICKY

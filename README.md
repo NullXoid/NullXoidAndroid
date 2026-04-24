@@ -11,6 +11,7 @@ Android frontend for NullXoid, built with Kotlin, Jetpack Compose, and Gradle.
 - Health screen for backend/runtime status
 - Settings screen with configurable backend base URL
 - Experimental embedded on-device backend scaffold for local streaming development
+- Persistent embedded-mode chat storage backed by local SQLite
 - In-app debug APK update check, download, and installer handoff backed by GitHub prereleases
 
 This repository is intended to stay aligned with the current NullXoid backend contract rather than introducing Android-specific API drift.

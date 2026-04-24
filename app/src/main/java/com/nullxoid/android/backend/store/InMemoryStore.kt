@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Process-lifetime store used by the embedded backend. Good enough to
  * prove the protocol; swap for DataStore/Room if persistence matters.
  */
-class InMemoryStore {
+class InMemoryStore : EmbeddedStore {
     private val tenantId = "local-tenant"
     private val userId = "local-user"
 
@@ -30,19 +30,19 @@ class InMemoryStore {
 
     private val chats = ConcurrentHashMap<String, ChatRecord>()
 
-    fun auth(): AuthState = if (signedIn) defaultAuth else AuthState(authenticated = false)
+    override fun auth(): AuthState = if (signedIn) defaultAuth else AuthState(authenticated = false)
 
-    fun login(username: String, password: String): AuthState {
+    override fun login(username: String, password: String): AuthState {
         signedIn = true
         return defaultAuth.copy(username = username, displayName = username)
     }
 
-    fun logout() { signedIn = false }
+    override fun logout() { signedIn = false }
 
-    fun listChats(): List<ChatRecord> = chats.values
+    override fun listChats(): List<ChatRecord> = chats.values
         .sortedByDescending { it.updatedAt ?: it.createdAt ?: "" }
 
-    fun createChat(
+    override fun createChat(
         workspaceId: String?,
         projectId: String?,
         title: String,
@@ -64,7 +64,7 @@ class InMemoryStore {
         return record
     }
 
-    fun appendAssistantMessage(chatId: String, assistantText: String): ChatRecord? {
+    override fun appendAssistantMessage(chatId: String, assistantText: String): ChatRecord? {
         val existing = chats[chatId] ?: return null
         val now = java.time.Instant.now().toString()
         val updated = existing.copy(
@@ -78,7 +78,7 @@ class InMemoryStore {
         return updated
     }
 
-    fun archive(chatId: String, archived: Boolean): ChatRecord? {
+    override fun archive(chatId: String, archived: Boolean): ChatRecord? {
         val existing = chats[chatId] ?: return null
         val updated = existing.copy(archived = archived)
         chats[chatId] = updated

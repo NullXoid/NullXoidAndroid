@@ -1,9 +1,10 @@
 package com.nullxoid.android.backend
 
+import android.content.Context
 import com.nullxoid.android.backend.engine.EchoEngine
 import com.nullxoid.android.backend.engine.LlmEngine
 import com.nullxoid.android.backend.routes.nullxoidRoutes
-import com.nullxoid.android.backend.store.InMemoryStore
+import com.nullxoid.android.backend.store.SQLiteStore
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
@@ -24,10 +25,11 @@ import kotlinx.serialization.json.put
  * on. The [engine] plug is where a real on-device LLM would swap in.
  */
 class EmbeddedServer(
+    context: Context,
     private val port: Int,
     val engine: LlmEngine = EchoEngine()
 ) {
-    private val store = InMemoryStore()
+    private val store = SQLiteStore(context)
 
     private val engineRef: io.ktor.server.engine.ApplicationEngine =
         embeddedServer(CIO, port = port, host = "127.0.0.1") {

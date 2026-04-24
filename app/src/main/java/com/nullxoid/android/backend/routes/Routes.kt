@@ -11,7 +11,7 @@ import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.ModelListResponse
 import com.nullxoid.android.data.model.RemoteSettings
 import com.nullxoid.android.backend.engine.LlmEngine
-import com.nullxoid.android.backend.store.InMemoryStore
+import com.nullxoid.android.backend.store.EmbeddedStore
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -34,7 +34,7 @@ import kotlinx.serialization.json.put
  * AiAssistant/src/bridge/nullxoid_backend_bridge.cpp so the same client can
  * talk to either the desktop's remote backend or this embedded one.
  */
-fun Route.nullxoidRoutes(store: InMemoryStore, engine: LlmEngine) {
+fun Route.nullxoidRoutes(store: EmbeddedStore, engine: LlmEngine) {
     authRoutes(store)
     healthRoutes(engine)
     modelRoutes(engine)
@@ -43,7 +43,7 @@ fun Route.nullxoidRoutes(store: InMemoryStore, engine: LlmEngine) {
     chatStreamRoute(store, engine)
 }
 
-private fun Route.authRoutes(store: InMemoryStore) {
+private fun Route.authRoutes(store: EmbeddedStore) {
     get("/auth/me") { call.respond(store.auth()) }
 
     post("/auth/login") {
@@ -112,7 +112,7 @@ private fun Route.settingsRoutes(engine: LlmEngine) {
     }
 }
 
-private fun Route.chatRoutes(store: InMemoryStore) {
+private fun Route.chatRoutes(store: EmbeddedStore) {
     get("/api/chats") { call.respond(ChatListResponse(chats = store.listChats())) }
 
     post("/api/chats") {
@@ -145,7 +145,7 @@ private fun Route.chatRoutes(store: InMemoryStore) {
  *
  * terminated by a single `event: completed` frame.
  */
-private fun Route.chatStreamRoute(store: InMemoryStore, engine: LlmEngine) {
+private fun Route.chatStreamRoute(store: EmbeddedStore, engine: LlmEngine) {
     val json = Json { explicitNulls = false; encodeDefaults = true }
 
     post("/chat/stream") {
