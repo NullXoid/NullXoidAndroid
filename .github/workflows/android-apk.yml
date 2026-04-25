@@ -14,6 +14,11 @@ jobs:
   build-apks:
     name: Build Android APKs
     runs-on: ubuntu-latest
+    env:
+      NULLXOID_SIGNING_KEYSTORE_BASE64: ${{ secrets.NULLXOID_SIGNING_KEYSTORE_BASE64 }}
+      NULLXOID_SIGNING_STORE_PASSWORD: ${{ secrets.NULLXOID_SIGNING_STORE_PASSWORD }}
+      NULLXOID_SIGNING_KEY_ALIAS: ${{ secrets.NULLXOID_SIGNING_KEY_ALIAS }}
+      NULLXOID_SIGNING_KEY_PASSWORD: ${{ secrets.NULLXOID_SIGNING_KEY_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -33,6 +38,12 @@ jobs:
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
+
+      - name: Configure update APK signing
+        if: env.NULLXOID_SIGNING_KEYSTORE_BASE64 != ''
+        run: |
+          echo "$NULLXOID_SIGNING_KEYSTORE_BASE64" | base64 --decode > app/nullxoid-update.jks
+          echo "NULLXOID_SIGNING_STORE_FILE=$PWD/app/nullxoid-update.jks" >> "$GITHUB_ENV"
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug
