@@ -53,8 +53,15 @@ fun SettingsScreen(
     onInstallUpdate: () -> Unit
 ) {
     var urlDraft by remember(state.backendUrl) { mutableStateOf(state.backendUrl) }
-    var ollamaUrlDraft by remember(state.ollamaUrl) { mutableStateOf(state.ollamaUrl) }
-    var ollamaModelDraft by remember(state.ollamaModel) { mutableStateOf(state.ollamaModel) }
+    var providerUrlDraft by remember(state.ollamaUrl) { mutableStateOf(state.ollamaUrl) }
+    var providerModelDraft by remember(state.ollamaModel) { mutableStateOf(state.ollamaModel) }
+    val selectedProviderName = when (state.embeddedEngine) {
+        SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP -> "llama.cpp"
+        SettingsStore.EMBEDDED_ENGINE_OLLAMA -> "Ollama"
+        else -> "Echo"
+    }
+    val usesExternalProvider = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_OLLAMA ||
+        state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP
 
     Scaffold(
         topBar = {
@@ -84,13 +91,10 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(
-                        "Run backend inside this app",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Text("Run backend inside this app", style = MaterialTheme.typography.bodyMedium)
                     Text(
                         if (state.embeddedEnabled)
-                            "Running on 127.0.0.1:8090 - echo engine"
+                            "Running on 127.0.0.1:8090 - $selectedProviderName provider"
                         else
                             "Use a remote NullXoid backend via the Base URL below",
                         style = MaterialTheme.typography.bodySmall
@@ -102,7 +106,10 @@ fun SettingsScreen(
                     onCheckedChange = onToggleEmbedded
                 )
             }
+
             Spacer(Modifier.height(12.dp))
+            Text("Provider", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_ECHO,
@@ -114,27 +121,41 @@ fun SettingsScreen(
                     onClick = { onSelectEmbeddedEngine(SettingsStore.EMBEDDED_ENGINE_OLLAMA) },
                     label = { Text("Ollama") }
                 )
+                FilterChip(
+                    selected = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP,
+                    onClick = { onSelectEmbeddedEngine(SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP) },
+                    label = { Text("llama.cpp") }
+                )
             }
-            if (state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_OLLAMA) {
+
+            if (usesExternalProvider) {
                 Spacer(Modifier.height(12.dp))
+                Text(
+                    if (state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP)
+                        "Use this for Termux llama-server, usually http://127.0.0.1:8080."
+                    else
+                        "Use this for Ollama, usually http://127.0.0.1:11434.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = ollamaUrlDraft,
-                    onValueChange = { ollamaUrlDraft = it },
-                    label = { Text("Ollama URL") },
+                    value = providerUrlDraft,
+                    onValueChange = { providerUrlDraft = it },
+                    label = { Text("$selectedProviderName URL") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = ollamaModelDraft,
-                    onValueChange = { ollamaModelDraft = it },
-                    label = { Text("Ollama model") },
+                    value = providerModelDraft,
+                    onValueChange = { providerModelDraft = it },
+                    label = { Text("$selectedProviderName model") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = { onSaveOllamaSettings(ollamaUrlDraft, ollamaModelDraft) }) {
-                    Text("Save Ollama")
+                Button(onClick = { onSaveOllamaSettings(providerUrlDraft, providerModelDraft) }) {
+                    Text("Save $selectedProviderName")
                 }
             }
 
@@ -194,10 +215,7 @@ fun SettingsScreen(
             )
             updateInfo?.let { info ->
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    "Latest: ${info.latestReleaseName}",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text("Latest: ${info.latestReleaseName}", style = MaterialTheme.typography.bodySmall)
                 Text(
                     if (info.updateAvailable) "Update available" else "Already current",
                     style = MaterialTheme.typography.bodySmall,
@@ -215,20 +233,14 @@ fun SettingsScreen(
                 Button(
                     onClick = onCheckForUpdate,
                     enabled = !state.checkingUpdate && !state.installingUpdate
-                ) {
-                    Text(if (state.checkingUpdate) "Checking" else "Check")
-                }
-                OutlinedButton(onClick = onOpenUpdateReleasePage) {
-                    Text("Release")
-                }
+                ) { Text(if (state.checkingUpdate) "Checking" else "Check") }
+                OutlinedButton(onClick = onOpenUpdateReleasePage) { Text("Release") }
                 OutlinedButton(
                     onClick = onInstallUpdate,
                     enabled = updateInfo?.updateAvailable == true &&
                         updateInfo.apkDownloadUrl != null &&
                         !state.installingUpdate
-                ) {
-                    Text(if (state.installingUpdate) "Installing" else "Install")
-                }
+                ) { Text(if (state.installingUpdate) "Installing" else "Install") }
             }
         }
     }
