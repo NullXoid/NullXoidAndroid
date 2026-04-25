@@ -9,6 +9,7 @@ import android.os.IBinder
 import com.nullxoid.android.backend.engine.EchoEngine
 import com.nullxoid.android.backend.engine.LlmEngine
 import com.nullxoid.android.backend.engine.OllamaEngine
+import com.nullxoid.android.backend.engine.LlamaCppEngine
 import com.nullxoid.android.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -43,6 +44,10 @@ class BackendService : Service() {
                 baseUrl = settingsStore.ollamaUrl.first(),
                 model = settingsStore.ollamaModel.first()
             )
+            SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP -> LlamaCppEngine(
+                baseUrl = settingsStore.ollamaUrl.first(),
+                model = settingsStore.ollamaModel.first()
+            )
             else -> EchoEngine()
         }
     }
@@ -62,9 +67,7 @@ class BackendService : Service() {
             CHANNEL_ID,
             "NullXoid Embedded Backend",
             NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Keeps the on-device NullXoid backend available."
-        }
+        )
         manager.createNotificationChannel(channel)
     }
 
