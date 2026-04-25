@@ -51,6 +51,13 @@ Pushes to `main` also run the GitHub Actions APK workflow and publish prerelease
 
 The app checks for newer prereleases at startup, every six hours while running, and whenever the user taps Check in Settings. When an update is available, it shows an in-app prompt with Update and Later actions. Update downloads the APK and launches Android's package installer; Android still requires the user to approve the install prompt and allow installs from this app when sideloading is not already enabled.
 
+Android will only update an installed package when the new APK is signed with the same key as the installed APK. If the phone shows `App not installed as package conflicts with an existing package`, uninstall the old NullXoid build once, then install the new APK. To prevent that conflict for future GitHub prerelease APKs, configure these repository secrets so CI signs every debug APK with the same update key:
+
+- `NULLXOID_SIGNING_KEYSTORE_BASE64`
+- `NULLXOID_SIGNING_STORE_PASSWORD`
+- `NULLXOID_SIGNING_KEY_ALIAS`
+- `NULLXOID_SIGNING_KEY_PASSWORD`
+
 ## Run
 
 1. Start the NullXoid backend.
