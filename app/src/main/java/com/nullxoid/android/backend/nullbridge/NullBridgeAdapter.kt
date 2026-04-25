@@ -46,7 +46,8 @@ class NullBridgeAdapter(
         capability: String,
         targetRole: String,
         targetId: String?,
-        payload: JsonObject
+        payload: JsonObject,
+        actingUser: JsonObject
     ): JsonObject = withContext(Dispatchers.IO) {
         if (!isConfigured()) {
             return@withContext buildJsonObject {
@@ -62,6 +63,7 @@ class NullBridgeAdapter(
             put("capability", capability)
             put("targetRole", targetRole)
             targetId?.takeIf { it.isNotBlank() }?.let { put("targetId", it) }
+            put("actingUser", actingUser)
             put("payload", payload)
         }
         val httpRequest = Request.Builder()

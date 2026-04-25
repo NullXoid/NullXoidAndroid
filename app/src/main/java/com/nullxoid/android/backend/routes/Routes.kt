@@ -24,8 +24,10 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.utils.io.writeStringUtf8
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -39,7 +41,7 @@ fun Route.nullxoidRoutes(store: EmbeddedStore, engine: LlmEngine) {
     authRoutes(store)
     healthRoutes(engine)
     aibenchieRoutes()
-    nullBridgeRoutes()
+    nullBridgeRoutes(store)
     modelRoutes(engine)
     settingsRoutes(engine)
     chatRoutes(store)
@@ -95,7 +97,7 @@ private fun Route.aibenchieRoutes() {
     }
 }
 
-private fun Route.nullBridgeRoutes(adapter: NullBridgeAdapter = NullBridgeAdapter()) {
+private fun Route.nullBridgeRoutes(store: EmbeddedStore, adapter: NullBridgeAdapter = NullBridgeAdapter()) {
     get("/api/nullbridge/status") {
         call.respond(adapter.status())
     }
@@ -114,7 +116,13 @@ private fun Route.nullBridgeRoutes(adapter: NullBridgeAdapter = NullBridgeAdapte
             call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("detail", "targetRole is required") })
             return@post
         }
-        call.respond(adapter.routeCheck(capability, targetRole, targetId, payload))
+        val auth = store.auth()
+        val actingUser = buildJsonObject {
+            put("userId", auth.userId ?: "android_local_user")
+            put("roles", JsonArray(auth.roles.map { JsonPrimitive(it) }))
+            put("platform", "android")
+        }
+        call.respond(adapter.routeCheck(capability, targetRole, targetId, payload, actingUser))
     }
 }
 
