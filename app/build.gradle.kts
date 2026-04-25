@@ -9,6 +9,21 @@ android {
     namespace = "com.nullxoid.android"
     compileSdk = 34
 
+    val updateSigningStoreFile = providers.gradleProperty("NULLXOID_SIGNING_STORE_FILE")
+        .orElse(providers.environmentVariable("NULLXOID_SIGNING_STORE_FILE"))
+    val updateSigningStorePassword = providers.gradleProperty("NULLXOID_SIGNING_STORE_PASSWORD")
+        .orElse(providers.environmentVariable("NULLXOID_SIGNING_STORE_PASSWORD"))
+    val updateSigningKeyAlias = providers.gradleProperty("NULLXOID_SIGNING_KEY_ALIAS")
+        .orElse(providers.environmentVariable("NULLXOID_SIGNING_KEY_ALIAS"))
+    val updateSigningKeyPassword = providers.gradleProperty("NULLXOID_SIGNING_KEY_PASSWORD")
+        .orElse(providers.environmentVariable("NULLXOID_SIGNING_KEY_PASSWORD"))
+    val hasUpdateSigning = listOf(
+        updateSigningStoreFile,
+        updateSigningStorePassword,
+        updateSigningKeyAlias,
+        updateSigningKeyPassword
+    ).all { it.isPresent }
+
     defaultConfig {
         applicationId = "com.nullxoid.android"
         minSdk = 26
@@ -37,9 +52,23 @@ android {
         jvmTarget = "17"
     }
 
+    signingConfigs {
+        if (hasUpdateSigning) {
+            create("update") {
+                storeFile = file(updateSigningStoreFile.get())
+                storePassword = updateSigningStorePassword.get()
+                keyAlias = updateSigningKeyAlias.get()
+                keyPassword = updateSigningKeyPassword.get()
+            }
+        }
+    }
+
     buildTypes {
         debug {
             manifestPlaceholders["networkSecurityConfig"] = "@xml/debug_network_security_config"
+            if (hasUpdateSigning) {
+                signingConfig = signingConfigs.getByName("update")
+            }
         }
         release {
             manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config"
