@@ -68,11 +68,11 @@ class SettingsStore(private val context: Context) {
     }
 
     companion object {
-        const val DEFAULT_BACKEND_URL = "http://10.0.2.2:8090"
+        const val DEFAULT_BACKEND_URL = "http://localhost:8090"
         const val EMBEDDED_BACKEND_URL = "http://127.0.0.1:8090"
         const val EMBEDDED_ENGINE_ECHO = "echo"
         const val EMBEDDED_ENGINE_OLLAMA = "ollama"
-        const val DEFAULT_OLLAMA_URL = "http://10.0.2.2:11434"
+        const val DEFAULT_OLLAMA_URL = "http://localhost:11434"
         const val DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
     }
 }

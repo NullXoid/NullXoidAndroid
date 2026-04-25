@@ -24,7 +24,7 @@ This repository is intended to stay aligned with the current NullXoid backend co
 
 ## Backend Configuration
 
-The app defaults to `http://10.0.2.2:8090`, which points an Android emulator back to a backend running on the host machine.
+The app defaults to `http://localhost:8090`. Configure `Backend URL` in settings for the backend reachable from your emulator or device.
 
 You can change the backend URL from the in-app Settings screen.
 
@@ -35,7 +35,7 @@ Embedded backend mode runs a local Ktor server inside the Android app on `http:/
 - `Echo`: deterministic local streaming for smoke testing with no model dependency.
 - `Ollama`: relays embedded backend chat streams to an Ollama server using the configured Ollama URL and model.
 
-For an emulator talking to Ollama on the host, use `http://10.0.2.2:11434`. For a physical device, Ollama must be reachable over LAN or tunnel, and the host must allow non-local connections.
+For local Ollama testing, configure `Ollama URL` for the endpoint reachable from your emulator or device. Physical devices should use an approved LAN, tunnel, or remote route that matches your security policy.
 
 ## Build
 

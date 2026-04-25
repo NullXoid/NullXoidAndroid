@@ -142,7 +142,7 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Tip: use http://10.0.2.2:8090 when running the backend on the host of an emulator.",
+                "Tip: configure this URL for the backend reachable from your emulator or device.",
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(12.dp))

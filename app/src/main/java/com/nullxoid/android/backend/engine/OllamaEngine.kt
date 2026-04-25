@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit
  *
  * Ollama is expected to be reachable on the device's network — see
  * docs for host setup (default 127.0.0.1:11434 is host-only; emulator
- * uses 10.0.2.2; physical phones need OLLAMA_HOST=0.0.0.0 on the host).
+ * must point at an endpoint reachable from the emulator or device).
  */
 class OllamaEngine(
     private val baseUrl: String,
