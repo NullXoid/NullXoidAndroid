@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.model.ChatRecord
 import com.nullxoid.android.ui.AppUiState
@@ -54,15 +55,30 @@ fun ChatListScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, null) }
-                    IconButton(onClick = onOpenHealth) { Icon(Icons.Default.Favorite, "health") }
-                    IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, null) }
-                    IconButton(onClick = onLogout) { Icon(Icons.AutoMirrored.Filled.Logout, null) }
+                    IconButton(
+                        modifier = Modifier.testTag("chat-list-refresh"),
+                        onClick = onRefresh
+                    ) { Icon(Icons.Default.Refresh, null) }
+                    IconButton(
+                        modifier = Modifier.testTag("chat-list-health"),
+                        onClick = onOpenHealth
+                    ) { Icon(Icons.Default.Favorite, "health") }
+                    IconButton(
+                        modifier = Modifier.testTag("chat-list-settings"),
+                        onClick = onOpenSettings
+                    ) { Icon(Icons.Default.Settings, null) }
+                    IconButton(
+                        modifier = Modifier.testTag("chat-list-logout"),
+                        onClick = onLogout
+                    ) { Icon(Icons.AutoMirrored.Filled.Logout, null) }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onNewChat) { Icon(Icons.Default.Add, "New chat") }
+            FloatingActionButton(
+                modifier = Modifier.testTag("chat-list-new-chat"),
+                onClick = onNewChat
+            ) { Icon(Icons.Default.Add, "New chat") }
         }
     ) { inner ->
         Column(

@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -42,7 +43,10 @@ fun LoginScreen(
             TopAppBar(
                 title = { Text("NullXoid") },
                 actions = {
-                    TextButton(onClick = onOpenSettings) { Text("Backend") }
+                    TextButton(
+                        modifier = Modifier.testTag("login-backend-button"),
+                        onClick = onOpenSettings
+                    ) { Text("Backend") }
                 }
             )
         }
@@ -67,7 +71,8 @@ fun LoginScreen(
                 onValueChange = { username = it },
                 label = { Text("Username") },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                modifier = Modifier.testTag("login-username")
             )
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
@@ -76,13 +81,15 @@ fun LoginScreen(
                 label = { Text("Password") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.testTag("login-password")
             )
             Spacer(Modifier.height(24.dp))
             if (state.loading) {
                 CircularProgressIndicator()
             } else {
                 Button(
+                    modifier = Modifier.testTag("login-submit"),
                     onClick = { onLogin(username, password) },
                     enabled = username.isNotBlank() && password.isNotBlank()
                 ) { Text("Sign in") }

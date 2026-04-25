@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.model.ChatMessage
 import com.nullxoid.android.ui.AppUiState
@@ -97,7 +98,9 @@ fun ChatScreen(
                         OutlinedTextField(
                             value = draft,
                             onValueChange = { draft = it },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("chat-message-input"),
                             placeholder = { Text("Message...") },
                             maxLines = 6,
                             enabled = !state.streaming
@@ -107,6 +110,7 @@ fun ChatScreen(
                             IconButton(onClick = onCancel) { Icon(Icons.Default.Stop, "stop") }
                         } else {
                             IconButton(
+                                modifier = Modifier.testTag("chat-send"),
                                 onClick = {
                                     val text = draft
                                     draft = ""

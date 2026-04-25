@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.ui.AppUiState
@@ -60,7 +61,10 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text("Settings") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                    IconButton(
+                        modifier = Modifier.testTag("settings-back"),
+                        onClick = onBack
+                    ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 }
             )
         }
@@ -92,7 +96,11 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-                Switch(checked = state.embeddedEnabled, onCheckedChange = onToggleEmbedded)
+                Switch(
+                    modifier = Modifier.testTag("settings-embedded-switch"),
+                    checked = state.embeddedEnabled,
+                    onCheckedChange = onToggleEmbedded
+                )
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -138,7 +146,9 @@ fun SettingsScreen(
                 onValueChange = { urlDraft = it },
                 label = { Text("Base URL") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings-backend-url")
             )
             Spacer(Modifier.height(8.dp))
             Text(
@@ -146,7 +156,10 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(12.dp))
-            Button(onClick = { onSave(urlDraft.trim()) }) { Text("Save") }
+            Button(
+                modifier = Modifier.testTag("settings-save-backend-url"),
+                onClick = { onSave(urlDraft.trim()) }
+            ) { Text("Save") }
 
             Spacer(Modifier.height(24.dp))
             Row(

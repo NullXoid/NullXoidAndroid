@@ -13,6 +13,7 @@ android {
         applicationId = "com.nullxoid.android"
         minSdk = 26
         targetSdk = 34
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = providers.gradleProperty("APP_VERSION_CODE")
             .orElse(providers.environmentVariable("APP_VERSION_CODE"))
             .map(String::toInt)
@@ -37,7 +38,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            manifestPlaceholders["networkSecurityConfig"] = "@xml/debug_network_security_config"
+        }
         release {
+            manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config"
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -72,6 +77,12 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
