@@ -2,6 +2,19 @@
 
 Android frontend for NullXoid, built with Kotlin, Jetpack Compose, and Gradle.
 
+## Suite Role
+
+NullXoidAndroid is the Android client for the NullXoid suite.
+
+```text
+Android UI
+  -> Android embedded or configured backend
+  -> NullBridge
+  -> embedded backend / remote fallback / safe mobile-supported services
+```
+
+The Android app should talk only to its Android backend path. It must not receive NullBridge service credentials or call privileged mesh routes directly.
+
 ## Current Scope
 
 - Login against the existing NullXoid backend
@@ -15,6 +28,12 @@ Android frontend for NullXoid, built with Kotlin, Jetpack Compose, and Gradle.
 - In-app debug APK update check, download, and installer handoff backed by GitHub prereleases
 
 This repository is intended to stay aligned with the current NullXoid backend contract rather than introducing Android-specific API drift.
+
+## Public And Private Boundary
+
+Do not commit provider keys, private backend URLs, local device tokens, signing keys, production update credentials, or personal network details.
+
+Runtime backend URLs should be user-configured in the app or supplied by a controlled release channel.
 
 ## Requirements
 
