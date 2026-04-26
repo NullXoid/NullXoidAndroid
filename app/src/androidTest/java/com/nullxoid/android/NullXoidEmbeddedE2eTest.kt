@@ -26,7 +26,7 @@ class NullXoidEmbeddedE2eTest {
 
     @Test
     fun embeddedEchoBackendCanLoginAndStreamChat() {
-        compose.onNodeWithText("Sign in").assertIsDisplayed()
+        compose.onNodeWithTag("login-backend-button").assertIsDisplayed()
 
         compose.onNodeWithTag("login-backend-button").performClick()
         compose.onNodeWithText("Settings").assertIsDisplayed()
