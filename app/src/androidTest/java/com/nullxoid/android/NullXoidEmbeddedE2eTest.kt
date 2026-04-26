@@ -2,6 +2,7 @@ package com.nullxoid.android
 
 import android.Manifest
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -37,14 +38,14 @@ class NullXoidEmbeddedE2eTest {
         }
         compose.onNodeWithTag("settings-back").performClick()
 
-        compose.onNodeWithTag("login-username").performTextInput("e2e")
-        compose.onNodeWithTag("login-password").performTextInput("e2e")
-        compose.onNodeWithTag("login-submit").performClick()
-
-        compose.waitUntil(timeoutMillis = 10_000) {
-            compose.onAllNodes(hasText("No chats yet", substring = true))
-                .fetchSemanticsNodes().isNotEmpty()
+        val embeddedBackendAutoSignedIn = waitForTag("chat-list-new-chat", timeoutMillis = 10_000)
+        if (!embeddedBackendAutoSignedIn) {
+            compose.onNodeWithTag("login-username").performTextInput("e2e")
+            compose.onNodeWithTag("login-password").performTextInput("e2e")
+            compose.onNodeWithTag("login-submit").performClick()
+            assertTagAppears("chat-list-new-chat")
         }
+
         compose.onNodeWithTag("chat-list-new-chat").performClick()
         compose.onNodeWithText("Start the conversation.").assertIsDisplayed()
 
@@ -54,6 +55,19 @@ class NullXoidEmbeddedE2eTest {
         compose.waitUntil(timeoutMillis = 15_000) {
             compose.onAllNodes(hasText("You said: hello from e2e", substring = true))
                 .fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    private fun waitForTag(tag: String, timeoutMillis: Long): Boolean =
+        runCatching {
+            compose.waitUntil(timeoutMillis = timeoutMillis) {
+                compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty()
+            }
+        }.isSuccess
+
+    private fun assertTagAppears(tag: String, timeoutMillis: Long = 10_000) {
+        compose.waitUntil(timeoutMillis = timeoutMillis) {
+            compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty()
         }
     }
 }
