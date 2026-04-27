@@ -1,10 +1,10 @@
-# NullXoidAndroid
+# NullXoid Companion / Android
 
 Android frontend for NullXoid, built with Kotlin, Jetpack Compose, and Gradle.
 
 ## Suite Role
 
-NullXoidAndroid is the Android client for the NullXoid suite.
+NullXoid Companion and NullXoidAndroid are the same mobile client: the Android companion for the NullXoid suite.
 
 ```text
 Android UI
