@@ -47,9 +47,23 @@ The app defaults to `http://localhost:8090`. Configure `Backend URL` in settings
 
 You can change the backend URL from the in-app Settings screen.
 
+The Settings screen includes one-tap presets:
+
+- `Hosted API`: the release-channel HTTPS API, currently `https://api.echolabs.diy/nullxoid`
+- `Local`: local desktop/development backend
+- `Embedded`: on-device backend running inside the app
+
+Release builders can override the shipped presets without editing source:
+
+```powershell
+$env:NULLXOID_DEFAULT_BACKEND_URL="http://localhost:8090"
+$env:NULLXOID_PUBLIC_BACKEND_URL="https://api.echolabs.diy/nullxoid"
+.\gradlew.bat :app:assembleDebug
+```
+
 Production setup should be guided in-app. The target auth path is passkeys through Android Credential Manager, with OIDC PKCE optional for team identity providers and password fallback reserved for development or migration. See [docs/PASSKEY_AUTH_ANDROID.md](docs/PASSKEY_AUTH_ANDROID.md).
 
-For physical devices, replace the default with a reachable LAN or tunnel URL for the backend.
+For physical devices, use `Hosted API` for out-of-network access, or replace the default with a reachable LAN/tunnel URL for the backend.
 
 Embedded backend mode runs a local Ktor server inside the Android app on `http://127.0.0.1:8090`. The embedded engine can be set to:
 

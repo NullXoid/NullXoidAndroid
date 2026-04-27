@@ -1,6 +1,7 @@
 package com.nullxoid.android.data.repo
 
 import com.nullxoid.android.data.api.ChatStream
+import com.nullxoid.android.data.api.BackendEndpoint
 import com.nullxoid.android.data.api.NullXoidApi
 import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.ChatCreateRequest
@@ -41,8 +42,9 @@ class NullXoidRepository(
     val backendUrl: Flow<String> = settingsStore.backendUrl
 
     suspend fun setBackendUrl(url: String) {
-        settingsStore.setBackendUrl(url)
-        cachedBaseUrl = url
+        val normalized = BackendEndpoint.normalize(url)
+        settingsStore.setBackendUrl(normalized)
+        cachedBaseUrl = normalized
     }
 
     suspend fun bootstrap(): AuthState {

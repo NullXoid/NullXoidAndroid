@@ -9,6 +9,16 @@ android {
     namespace = "com.nullxoid.android"
     compileSdk = 34
 
+    fun String.asBuildConfigString(): String =
+        "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+    val defaultBackendUrl = providers.gradleProperty("NULLXOID_DEFAULT_BACKEND_URL")
+        .orElse(providers.environmentVariable("NULLXOID_DEFAULT_BACKEND_URL"))
+        .getOrElse("http://localhost:8090")
+    val publicBackendUrl = providers.gradleProperty("NULLXOID_PUBLIC_BACKEND_URL")
+        .orElse(providers.environmentVariable("NULLXOID_PUBLIC_BACKEND_URL"))
+        .getOrElse("https://api.echolabs.diy/nullxoid")
+
     val updateSigningStoreFile = providers.gradleProperty("NULLXOID_SIGNING_STORE_FILE")
         .orElse(providers.environmentVariable("NULLXOID_SIGNING_STORE_FILE"))
     val updateSigningStorePassword = providers.gradleProperty("NULLXOID_SIGNING_STORE_PASSWORD")
@@ -29,6 +39,8 @@ android {
         minSdk = 26
         targetSdk = 34
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "DEFAULT_BACKEND_URL", defaultBackendUrl.asBuildConfigString())
+        buildConfigField("String", "PUBLIC_BACKEND_URL", publicBackendUrl.asBuildConfigString())
         versionCode = providers.gradleProperty("APP_VERSION_CODE")
             .orElse(providers.environmentVariable("APP_VERSION_CODE"))
             .map(String::toInt)
@@ -126,4 +138,6 @@ dependencies {
     implementation("io.ktor:ktor-server-default-headers:$ktor")
     implementation("io.ktor:ktor-server-status-pages:$ktor")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor")
+
+    testImplementation("junit:junit:4.13.2")
 }

@@ -5,6 +5,8 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.nullxoid.android.BuildConfig
+import com.nullxoid.android.data.api.BackendEndpoint
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -44,7 +46,7 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setBackendUrl(url: String) {
-        context.settingsDataStore.edit { it[backendUrlKey] = url }
+        context.settingsDataStore.edit { it[backendUrlKey] = BackendEndpoint.normalize(url) }
     }
 
     suspend fun setSelectedModel(modelId: String) {
@@ -68,8 +70,15 @@ class SettingsStore(private val context: Context) {
     }
 
     companion object {
-        const val DEFAULT_BACKEND_URL = "http://localhost:8090"
-        const val EMBEDDED_BACKEND_URL = "http://127.0.0.1:8090"
+        val DEFAULT_BACKEND_URL: String = BackendEndpoint.normalize(
+            BuildConfig.DEFAULT_BACKEND_URL,
+            BackendEndpoint.LOCAL_DEFAULT_URL
+        )
+        val PUBLIC_BACKEND_URL: String = BackendEndpoint.normalize(
+            BuildConfig.PUBLIC_BACKEND_URL,
+            BackendEndpoint.PUBLIC_ECHOLABS_URL
+        )
+        const val EMBEDDED_BACKEND_URL = BackendEndpoint.EMBEDDED_URL
         const val EMBEDDED_ENGINE_ECHO = "echo"
         const val EMBEDDED_ENGINE_OLLAMA = "ollama"
         const val EMBEDDED_ENGINE_LLAMA_CPP = "llamacpp"

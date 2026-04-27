@@ -34,9 +34,7 @@ class NullXoidApi(
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
     private fun url(path: String): String {
-        val base = baseUrlProvider().trimEnd('/')
-        val suffix = if (path.startsWith('/')) path else "/$path"
-        return base + suffix
+        return BackendEndpoint.resolve(baseUrlProvider(), path)
     }
 
     private suspend inline fun <reified T> getJson(path: String): T =

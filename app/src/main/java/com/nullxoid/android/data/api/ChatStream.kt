@@ -37,11 +37,10 @@ class ChatStream(
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
     fun stream(request: ChatStreamRequest): Flow<StreamEvent> = callbackFlow {
-        val base = baseUrlProvider().trimEnd('/')
         val body = json.encodeToString(ChatStreamRequest.serializer(), request)
             .toRequestBody(jsonMedia)
         val httpReq = Request.Builder()
-            .url("$base/chat/stream")
+            .url(BackendEndpoint.resolve(baseUrlProvider(), "/chat/stream"))
             .header("Accept", "text/event-stream")
             .header("Cache-Control", "no-cache")
             .post(body)

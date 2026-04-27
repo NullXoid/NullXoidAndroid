@@ -173,9 +173,24 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Tip: configure this URL for the backend reachable from your emulator or device.",
+                "Use Hosted API for out-of-network phones, or Local/Embedded for development.",
                 style = MaterialTheme.typography.bodySmall
             )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(
+                    onClick = { urlDraft = SettingsStore.PUBLIC_BACKEND_URL },
+                    label = { Text("Hosted API") }
+                )
+                AssistChip(
+                    onClick = { urlDraft = SettingsStore.DEFAULT_BACKEND_URL },
+                    label = { Text("Local") }
+                )
+                AssistChip(
+                    onClick = { urlDraft = SettingsStore.EMBEDDED_BACKEND_URL },
+                    label = { Text("Embedded") }
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Button(
                 modifier = Modifier.testTag("settings-save-backend-url"),
