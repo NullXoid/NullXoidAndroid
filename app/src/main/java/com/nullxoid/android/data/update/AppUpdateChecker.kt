@@ -8,13 +8,12 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 
-private const val RELEASES_URL =
-    "https://api.github.com/repos/NullXoid/NullXoidAndroid/releases"
 private val VERSION_TAG = Regex("""^v(\d+)\.(\d+)\.(\d+)$""")
 
 data class AppUpdateInfo(
     val currentVersionName: String,
     val currentVersionCode: Int,
+    val releaseSource: String,
     val latestReleaseName: String,
     val versionCode: Int,
     val releasePageUrl: String,
@@ -26,25 +25,38 @@ class AppUpdateChecker(
     private val client: OkHttpClient = OkHttpClient()
 ) {
     suspend fun checkLatestDebugRelease(): AppUpdateInfo = withContext(Dispatchers.IO) {
+        val failures = mutableListOf<String>()
+        for (source in updateSources()) {
+            try {
+                return@withContext checkSource(source)
+            } catch (t: Throwable) {
+                failures += "${source.name}: ${t.message ?: t::class.java.simpleName}"
+            }
+        }
+        error("Update check failed: ${failures.joinToString("; ")}")
+    }
+
+    private fun checkSource(source: UpdateSource): AppUpdateInfo {
         val request = Request.Builder()
-            .url(RELEASES_URL)
-            .header("Accept", "application/vnd.github+json")
+            .url(source.releasesUrl)
+            .header("Accept", "application/json")
             .header("User-Agent", "NullXoidAndroid/${BuildConfig.VERSION_NAME}")
             .build()
 
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                error("Update check failed: HTTP ${response.code}")
+                error("HTTP ${response.code}")
             }
 
             val releases = JSONArray(response.body?.string().orEmpty())
-            val latest = releases.versionedReleases()
+            val latest = releases.versionedReleases(source)
                 .maxByOrNull { it.versionCode }
                 ?: error("No versioned APK release found")
 
-            AppUpdateInfo(
+            return AppUpdateInfo(
                 currentVersionName = BuildConfig.VERSION_NAME,
                 currentVersionCode = BuildConfig.VERSION_CODE,
+                releaseSource = source.name,
                 latestReleaseName = latest.displayName,
                 versionCode = latest.versionCode,
                 releasePageUrl = latest.releasePageUrl,
@@ -54,7 +66,20 @@ class AppUpdateChecker(
         }
     }
 
-    private fun JSONArray.versionedReleases(): List<ReleaseCandidate> = buildList {
+    private fun updateSources(): List<UpdateSource> = listOf(
+        UpdateSource(
+            name = "Forgejo",
+            releasesUrl = BuildConfig.APP_UPDATE_RELEASES_URL,
+            releasePageBase = BuildConfig.APP_UPDATE_RELEASE_PAGE_BASE
+        ),
+        UpdateSource(
+            name = "GitHub mirror",
+            releasesUrl = BuildConfig.APP_UPDATE_FALLBACK_RELEASES_URL,
+            releasePageBase = BuildConfig.APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE
+        )
+    ).filter { it.releasesUrl.isNotBlank() }
+
+    private fun JSONArray.versionedReleases(source: UpdateSource): List<ReleaseCandidate> = buildList {
         for (i in 0 until length()) {
             val release = optJSONObject(i) ?: continue
             val tag = release.optString("tag_name")
@@ -66,7 +91,7 @@ class AppUpdateChecker(
                     versionCode = versionCode,
                     releasePageUrl = release.optString(
                         "html_url",
-                        "https://github.com/NullXoid/NullXoidAndroid/releases/tag/$tag"
+                        "${source.releasePageBase.trimEnd('/')}/tag/$tag"
                     ),
                     apkDownloadUrl = release.findApkDownloadUrl()
                 )
@@ -85,6 +110,12 @@ class AppUpdateChecker(
         }
         return null
     }
+
+    private data class UpdateSource(
+        val name: String,
+        val releasesUrl: String,
+        val releasePageBase: String
+    )
 
     private data class ReleaseCandidate(
         val displayName: String,

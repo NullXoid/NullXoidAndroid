@@ -18,6 +18,19 @@ android {
     val publicBackendUrl = providers.gradleProperty("NULLXOID_PUBLIC_BACKEND_URL")
         .orElse(providers.environmentVariable("NULLXOID_PUBLIC_BACKEND_URL"))
         .getOrElse("https://api.echolabs.diy/nullxoid")
+    val appUpdateReleasesUrl = providers.gradleProperty("NULLXOID_APP_UPDATE_RELEASES_URL")
+        .orElse(providers.environmentVariable("NULLXOID_APP_UPDATE_RELEASES_URL"))
+        .getOrElse("http://git.echolabs.diy/api/v1/repos/EchoLabs/NullXoidAndroid/releases")
+    val appUpdateReleasePageBase = providers.gradleProperty("NULLXOID_APP_UPDATE_RELEASE_PAGE_BASE")
+        .orElse(providers.environmentVariable("NULLXOID_APP_UPDATE_RELEASE_PAGE_BASE"))
+        .getOrElse("http://git.echolabs.diy/EchoLabs/NullXoidAndroid/releases")
+    val appUpdateFallbackReleasesUrl = providers.gradleProperty("NULLXOID_APP_UPDATE_FALLBACK_RELEASES_URL")
+        .orElse(providers.environmentVariable("NULLXOID_APP_UPDATE_FALLBACK_RELEASES_URL"))
+        .getOrElse("https://api.github.com/repos/NullXoid/NullXoidAndroid/releases")
+    val appUpdateFallbackReleasePageBase =
+        providers.gradleProperty("NULLXOID_APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE")
+            .orElse(providers.environmentVariable("NULLXOID_APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE"))
+            .getOrElse("https://github.com/NullXoid/NullXoidAndroid/releases")
 
     val updateSigningStoreFile = providers.gradleProperty("NULLXOID_SIGNING_STORE_FILE")
         .orElse(providers.environmentVariable("NULLXOID_SIGNING_STORE_FILE"))
@@ -41,6 +54,18 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEFAULT_BACKEND_URL", defaultBackendUrl.asBuildConfigString())
         buildConfigField("String", "PUBLIC_BACKEND_URL", publicBackendUrl.asBuildConfigString())
+        buildConfigField("String", "APP_UPDATE_RELEASES_URL", appUpdateReleasesUrl.asBuildConfigString())
+        buildConfigField("String", "APP_UPDATE_RELEASE_PAGE_BASE", appUpdateReleasePageBase.asBuildConfigString())
+        buildConfigField(
+            "String",
+            "APP_UPDATE_FALLBACK_RELEASES_URL",
+            appUpdateFallbackReleasesUrl.asBuildConfigString()
+        )
+        buildConfigField(
+            "String",
+            "APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE",
+            appUpdateFallbackReleasePageBase.asBuildConfigString()
+        )
         versionCode = providers.gradleProperty("APP_VERSION_CODE")
             .orElse(providers.environmentVariable("APP_VERSION_CODE"))
             .map(String::toInt)

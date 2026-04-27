@@ -309,7 +309,9 @@ class NullXoidViewModel(
     fun openUpdateReleasePage() {
         openExternalUrl(
             _state.value.updateInfo?.releasePageUrl
-                ?: "https://github.com/NullXoid/NullXoidAndroid/releases/tag/latest-debug"
+                ?: BuildConfig.APP_UPDATE_RELEASE_PAGE_BASE.ifBlank {
+                    BuildConfig.APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE
+                }
         )
     }
 

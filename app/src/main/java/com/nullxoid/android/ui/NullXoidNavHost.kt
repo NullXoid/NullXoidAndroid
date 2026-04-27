@@ -127,7 +127,8 @@ fun NullXoidApp(app: NullXoidApplication) {
                     title = { Text("Update available") },
                     text = {
                         Text(
-                            "NullXoidAndroid ${updateInfo.latestReleaseName} is ready. " +
+                            "NullXoidAndroid ${updateInfo.latestReleaseName} is ready from " +
+                                "${updateInfo.releaseSource}. " +
                                 "You can install it now or do it later."
                         )
                     },

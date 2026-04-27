@@ -230,6 +230,7 @@ fun SettingsScreen(
             )
             updateInfo?.let { info ->
                 Spacer(Modifier.height(4.dp))
+                Text("Source: ${info.releaseSource}", style = MaterialTheme.typography.bodySmall)
                 Text("Latest: ${info.latestReleaseName}", style = MaterialTheme.typography.bodySmall)
                 Text(
                     if (info.updateAvailable) "Update available" else "Already current",

@@ -25,7 +25,7 @@ The Android app should talk only to its Android backend path. It must not receiv
 - Settings screen with configurable backend base URL
 - Experimental embedded on-device backend scaffold for local streaming development
 - Persistent embedded-mode chat storage backed by local SQLite
-- In-app debug APK update check, download, and installer handoff backed by GitHub prereleases
+- In-app debug APK update check, download, and installer handoff backed by Forgejo releases with a GitHub mirror fallback
 
 This repository is intended to stay aligned with the current NullXoid backend contract rather than introducing Android-specific API drift.
 
@@ -58,8 +58,11 @@ Release builders can override the shipped presets without editing source:
 ```powershell
 $env:NULLXOID_DEFAULT_BACKEND_URL="http://localhost:8090"
 $env:NULLXOID_PUBLIC_BACKEND_URL="https://api.echolabs.diy/nullxoid"
+$env:NULLXOID_APP_UPDATE_RELEASES_URL="http://git.echolabs.diy/api/v1/repos/EchoLabs/NullXoidAndroid/releases"
 .\gradlew.bat :app:assembleDebug
 ```
+
+Use an HTTPS Forgejo URL for release builds or public off-network update channels.
 
 Production setup should be guided in-app. The target auth path is passkeys through Android Credential Manager, with OIDC PKCE optional for team identity providers and password fallback reserved for development or migration. See [docs/PASSKEY_AUTH_ANDROID.md](docs/PASSKEY_AUTH_ANDROID.md).
 
@@ -82,16 +85,23 @@ From the repository root:
 
 The debug APK will be produced under `app/build/outputs/apk/debug/`.
 
-Pushes to `main` also run the GitHub Actions APK workflow and publish prerelease debug APK artifacts under both a versioned tag and `latest-debug`.
+Pushes to `main` run both the GitHub Actions APK workflow and the Forgejo Actions APK workflow. Both publish prerelease debug APK artifacts under a versioned tag and `latest-debug`; the app checks Forgejo first and falls back to the GitHub mirror if Forgejo is unavailable.
 
 The app checks for newer prereleases at startup, every six hours while running, and whenever the user taps Check in Settings. When an update is available, it shows an in-app prompt with Update and Later actions. Update downloads the APK and launches Android's package installer; Android still requires the user to approve the install prompt and allow installs from this app when sideloading is not already enabled.
 
-Android will only update an installed package when the new APK is signed with the same key as the installed APK. If the phone shows `App not installed as package conflicts with an existing package`, uninstall the old NullXoid build once, then install the new APK. To prevent that conflict for future GitHub prerelease APKs, configure these repository secrets so CI signs every debug APK with the same update key:
+Android will only update an installed package when the new APK is signed with the same key as the installed APK. If the phone shows `App not installed as package conflicts with an existing package`, uninstall the old NullXoid build once, then install the new APK. To prevent that conflict for future prerelease APKs, configure these repository secrets in both Forgejo and GitHub so CI signs every debug APK with the same update key:
 
 - `NULLXOID_SIGNING_KEYSTORE_BASE64`
 - `NULLXOID_SIGNING_STORE_PASSWORD`
 - `NULLXOID_SIGNING_KEY_ALIAS`
 - `NULLXOID_SIGNING_KEY_PASSWORD`
+
+Forgejo release publishing also needs `FORGEJO_TOKEN`, scoped to create/update releases in the `EchoLabs/NullXoidAndroid` repository. The update checker can be pointed at another release source with:
+
+- `NULLXOID_APP_UPDATE_RELEASES_URL`
+- `NULLXOID_APP_UPDATE_RELEASE_PAGE_BASE`
+- `NULLXOID_APP_UPDATE_FALLBACK_RELEASES_URL`
+- `NULLXOID_APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE`
 
 ## Run
 
