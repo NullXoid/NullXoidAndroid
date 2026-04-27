@@ -17,6 +17,7 @@ jobs:
       NULLXOID_SIGNING_KEY_ALIAS: ${{ secrets.NULLXOID_SIGNING_KEY_ALIAS }}
       NULLXOID_SIGNING_KEY_PASSWORD: ${{ secrets.NULLXOID_SIGNING_KEY_PASSWORD }}
       FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
 
     steps:
       - name: Checkout repository
@@ -63,8 +64,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -z "${FORGEJO_TOKEN:-}" ]; then
-            echo "FORGEJO_TOKEN is not configured; skipping Forgejo release publication."
+          token="${FORGEJO_TOKEN:-${GITHUB_TOKEN:-}}"
+          if [ -z "$token" ]; then
+            echo "No Forgejo Actions token is configured; skipping Forgejo release publication."
             exit 0
           fi
 
@@ -93,7 +95,7 @@ jobs:
             body="$3"
 
             response="$(curl -fsS \
-              -H "Authorization: token ${FORGEJO_TOKEN}" \
+              -H "Authorization: token ${token}" \
               -H "Accept: application/json" \
               "${api}/releases/tags/${tag}" || true)"
 
@@ -113,7 +115,7 @@ jobs:
           PY
           )"
               response="$(curl -fsS -X POST \
-                -H "Authorization: token ${FORGEJO_TOKEN}" \
+                -H "Authorization: token ${token}" \
                 -H "Accept: application/json" \
                 -H "Content-Type: application/json" \
                 -d "$payload" \
@@ -129,13 +131,13 @@ jobs:
             asset_id="$(printf '%s' "$response" | asset_id_for "NullXoidAndroid-debug.apk")"
             if [ -n "$asset_id" ]; then
               curl -fsS -X DELETE \
-                -H "Authorization: token ${FORGEJO_TOKEN}" \
+                -H "Authorization: token ${token}" \
                 -H "Accept: application/json" \
                 "${api}/releases/assets/${asset_id}"
             fi
 
             curl -fsS -X POST \
-              -H "Authorization: token ${FORGEJO_TOKEN}" \
+              -H "Authorization: token ${token}" \
               -H "Accept: application/json" \
               -F "attachment=@${apk}" \
               "${api}/releases/${release_id}/assets?name=NullXoidAndroid-debug.apk" \
