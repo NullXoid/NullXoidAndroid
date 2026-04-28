@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.ui.AppUiState
+import com.nullxoid.android.ui.passkeyEnrollmentStatusText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -218,12 +219,11 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
             val provider = state.passkeyProvider
             Text(
-                when {
-                    !state.auth.authenticated -> "Sign in to manage passkeys."
-                    provider?.registrationEnabled == true -> "Passkey enrollment ready."
-                    provider?.configured == true -> "Passkey enrollment disabled."
-                    else -> "Passkey provider not configured."
-                },
+                passkeyEnrollmentStatusText(
+                    authenticated = state.auth.authenticated,
+                    provider = provider,
+                    credentialCount = state.passkeyCredentials.size
+                ),
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(8.dp))

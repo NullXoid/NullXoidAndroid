@@ -80,7 +80,7 @@ fun NullXoidApp(
                         state = state,
                         onLogin = vm::login,
                         onOpenSettings = { nav.navigate(Routes.Settings) },
-                        onPasskeySetup = { vm.loginWithPasskey(context) },
+                        onPasskeySignIn = { vm.loginWithPasskey(context) },
                         onOidcSetup = vm::startOidcSignIn
                     )
                 }

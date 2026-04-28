@@ -37,7 +37,7 @@ fun LoginScreen(
     state: AppUiState,
     onLogin: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
-    onPasskeySetup: () -> Unit,
+    onPasskeySignIn: () -> Unit,
     onOidcSetup: () -> Unit
 ) {
     var username by remember { mutableStateOf("") }
@@ -84,9 +84,14 @@ fun LoginScreen(
             Spacer(Modifier.height(16.dp))
             Button(
                 modifier = Modifier.testTag("login-passkey"),
-                onClick = onPasskeySetup,
+                onClick = onPasskeySignIn,
                 enabled = !state.loading
-            ) { Text("Sign in with passkey") }
+            ) { Text("Use existing passkey") }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "First-time phone setup: sign in with password once, then add a passkey in Settings.",
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+            )
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 modifier = Modifier.testTag("login-oidc"),

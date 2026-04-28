@@ -31,6 +31,12 @@ class BackendEndpointTest {
     }
 
     @Test
+    fun debugReleaseVersionMatchesPublishedApk() {
+        assertEquals(42, BuildConfig.VERSION_CODE)
+        assertEquals("0.1.42", BuildConfig.VERSION_NAME)
+    }
+
+    @Test
     fun resolvePreservesMountedPublicApiBase() {
         assertEquals(
             "https://api.echolabs.diy/nullxoid/auth/login",

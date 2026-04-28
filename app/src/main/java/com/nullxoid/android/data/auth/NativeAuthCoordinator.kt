@@ -41,6 +41,7 @@ class NativeAuthCoordinator(
             ?: error("Passkey options response did not include request_json or public_key")
         val credentialRequest = GetCredentialRequest.Builder()
             .addCredentialOption(GetPublicKeyCredentialOption(requestJson = requestJson))
+            .setPreferImmediatelyAvailableCredentials(true)
             .build()
         val response = credentialManagerFactory(context).getCredential(
             context = context,
