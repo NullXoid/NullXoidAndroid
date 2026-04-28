@@ -124,7 +124,10 @@ fun NullXoidApp(
                         onSaveOllamaSettings = vm::setOllamaSettings,
                         onCheckForUpdate = vm::checkForUpdate,
                         onOpenUpdateReleasePage = vm::openUpdateReleasePage,
-                        onInstallUpdate = vm::installLatestUpdate
+                        onInstallUpdate = vm::installLatestUpdate,
+                        onRefreshPasskeys = vm::refreshPasskeys,
+                        onRegisterPasskey = { vm.registerPasskey(context) },
+                        onRevokePasskey = vm::revokePasskey
                     )
                 }
                 composable(Routes.Health) {

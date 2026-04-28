@@ -14,6 +14,7 @@ import com.nullxoid.android.data.model.ChatStreamRequest
 import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.OidcCompleteRequest
+import com.nullxoid.android.data.model.PasskeyCredentialsResponse
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.Flow
@@ -71,6 +72,21 @@ class NullXoidRepository(
         val state = nativeAuth.signInWithPasskey(context)
         _auth.value = state
         return state
+    }
+
+    suspend fun passkeyCredentials(): PasskeyCredentialsResponse {
+        refreshBaseUrl()
+        return api.passkeyCredentials()
+    }
+
+    suspend fun registerPasskey(context: Context): PasskeyCredentialsResponse {
+        refreshBaseUrl()
+        return nativeAuth.registerPasskey(context)
+    }
+
+    suspend fun revokePasskey(credentialId: String) {
+        refreshBaseUrl()
+        api.revokePasskey(credentialId)
     }
 
     suspend fun startOidcSignIn(redirectUri: String): OidcLaunch {

@@ -26,6 +26,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,7 +51,10 @@ fun SettingsScreen(
     onSaveOllamaSettings: (String, String) -> Unit,
     onCheckForUpdate: () -> Unit,
     onOpenUpdateReleasePage: () -> Unit,
-    onInstallUpdate: () -> Unit
+    onInstallUpdate: () -> Unit,
+    onRefreshPasskeys: () -> Unit,
+    onRegisterPasskey: () -> Unit,
+    onRevokePasskey: (String) -> Unit
 ) {
     var urlDraft by remember(state.backendUrl) { mutableStateOf(state.backendUrl) }
     var providerUrlDraft by remember(state.ollamaUrl) { mutableStateOf(state.ollamaUrl) }
@@ -62,6 +66,10 @@ fun SettingsScreen(
     }
     val usesExternalProvider = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_OLLAMA ||
         state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP
+
+    LaunchedEffect(state.auth.authenticated, state.backendUrl) {
+        if (state.auth.authenticated) onRefreshPasskeys()
+    }
 
     Scaffold(
         topBar = {
@@ -196,6 +204,68 @@ fun SettingsScreen(
                 modifier = Modifier.testTag("settings-save-backend-url"),
                 onClick = { onSave(urlDraft.trim()) }
             ) { Text("Save") }
+
+            Spacer(Modifier.height(24.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Account security", style = MaterialTheme.typography.titleMedium)
+                AssistChip(onClick = onRefreshPasskeys, label = { Text("Refresh") })
+            }
+            Spacer(Modifier.height(8.dp))
+            val provider = state.passkeyProvider
+            Text(
+                when {
+                    !state.auth.authenticated -> "Sign in to manage passkeys."
+                    provider?.registrationEnabled == true -> "Passkey enrollment ready."
+                    provider?.configured == true -> "Passkey enrollment disabled."
+                    else -> "Passkey provider not configured."
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                modifier = Modifier.testTag("settings-passkey-add"),
+                onClick = onRegisterPasskey,
+                enabled = state.auth.authenticated &&
+                    provider?.registrationEnabled == true &&
+                    !state.passkeyLoading
+            ) {
+                Text(if (state.passkeyLoading) "Working" else "Add passkey")
+            }
+            Spacer(Modifier.height(8.dp))
+            if (state.passkeyCredentials.isEmpty()) {
+                Text("No passkeys enrolled.", style = MaterialTheme.typography.bodySmall)
+            } else {
+                state.passkeyCredentials.forEach { credential ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                credential.rpId.ifBlank { provider?.rpId ?: "Passkey" },
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                credential.credentialId.take(18),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        OutlinedButton(
+                            modifier = Modifier.testTag("settings-passkey-remove"),
+                            enabled = !state.passkeyLoading,
+                            onClick = { onRevokePasskey(credential.credentialId) }
+                        ) {
+                            Text("Remove")
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
 
             Spacer(Modifier.height(24.dp))
             Row(

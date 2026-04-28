@@ -42,6 +42,9 @@ Password sign-in remains a development or migration fallback only. Admin account
 The app now has native ceremony plumbing:
 
 - `Sign in with passkey` calls Android Credential Manager and sends the assertion to `/auth/passkey/complete`.
+- Settings can list enrolled credentials from `/auth/passkey/credentials`.
+- `Add passkey` calls Android Credential Manager and sends the registration response to `/auth/passkey/register/complete`.
+- Removing a passkey revokes it through `/auth/passkey/credentials/{credential_id}`.
 - `Continue with OIDC` starts Authorization Code with PKCE at `/auth/oidc/start`.
 - The OIDC callback returns to `nullxoid://auth/oidc/callback`.
 - The app verifies the OIDC state before exchanging the code at `/auth/oidc/complete`.

@@ -11,6 +11,7 @@ import com.nullxoid.android.data.model.OidcCompleteRequest
 import com.nullxoid.android.data.model.OidcStartRequest
 import com.nullxoid.android.data.model.OidcStartResponse
 import com.nullxoid.android.data.model.PasskeyCompleteRequest
+import com.nullxoid.android.data.model.PasskeyCredentialsResponse
 import com.nullxoid.android.data.model.PasskeyOptionsResponse
 import com.nullxoid.android.data.model.RemoteSettings
 import kotlinx.coroutines.Dispatchers
@@ -92,6 +93,19 @@ class NullXoidApi(
 
     suspend fun completePasskey(request: PasskeyCompleteRequest): AuthState =
         sendJson("POST", "/auth/passkey/complete", request)
+
+    suspend fun passkeyCredentials(): PasskeyCredentialsResponse =
+        getJson("/auth/passkey/credentials")
+
+    suspend fun passkeyRegistrationOptions(): PasskeyOptionsResponse =
+        getJson("/auth/passkey/register/options")
+
+    suspend fun completePasskeyRegistration(request: PasskeyCompleteRequest): PasskeyCredentialsResponse =
+        sendJson("POST", "/auth/passkey/register/complete", request)
+
+    suspend fun revokePasskey(credentialId: String) {
+        sendNoBody("DELETE", "/auth/passkey/credentials/$credentialId")
+    }
 
     suspend fun startOidc(request: OidcStartRequest): OidcStartResponse =
         sendJson("POST", "/auth/oidc/start", request)

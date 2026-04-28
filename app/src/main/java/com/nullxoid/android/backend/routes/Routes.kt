@@ -20,6 +20,7 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytesWriter
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
@@ -61,6 +62,22 @@ private fun Route.authRoutes(store: EmbeddedStore) {
     }
 
     post("/auth/passkey/complete") {
+        call.respond(HttpStatusCode.NotImplemented, nativeAuthNotConfigured("passkey"))
+    }
+
+    get("/auth/passkey/credentials") {
+        call.respond(HttpStatusCode.NotImplemented, nativeAuthNotConfigured("passkey"))
+    }
+
+    get("/auth/passkey/register/options") {
+        call.respond(HttpStatusCode.NotImplemented, nativeAuthNotConfigured("passkey"))
+    }
+
+    post("/auth/passkey/register/complete") {
+        call.respond(HttpStatusCode.NotImplemented, nativeAuthNotConfigured("passkey"))
+    }
+
+    delete("/auth/passkey/credentials/{credential_id}") {
         call.respond(HttpStatusCode.NotImplemented, nativeAuthNotConfigured("passkey"))
     }
 

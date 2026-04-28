@@ -1,6 +1,8 @@
 package com.nullxoid.android.data.auth
 
 import android.content.Context
+import androidx.credentials.CreatePublicKeyCredentialRequest
+import androidx.credentials.CreatePublicKeyCredentialResponse
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetPublicKeyCredentialOption
@@ -9,6 +11,7 @@ import com.nullxoid.android.data.api.NullXoidApi
 import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.OidcStartRequest
 import com.nullxoid.android.data.model.PasskeyCompleteRequest
+import com.nullxoid.android.data.model.PasskeyCredentialsResponse
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -49,6 +52,26 @@ class NativeAuthCoordinator(
             PasskeyCompleteRequest(
                 requestId = options.requestId,
                 credentialJson = credential.authenticationResponseJson
+            )
+        )
+    }
+
+    suspend fun registerPasskey(context: Context): PasskeyCredentialsResponse {
+        val options = api.passkeyRegistrationOptions()
+        val requestJson = options.requestJson
+            ?: options.publicKeySnake?.let(::encodePublicKey)
+            ?: options.publicKey?.let(::encodePublicKey)
+            ?: error("Passkey registration response did not include request_json or public_key")
+        val response = credentialManagerFactory(context).createCredential(
+            context = context,
+            request = CreatePublicKeyCredentialRequest(requestJson = requestJson)
+        )
+        val credential = response as? CreatePublicKeyCredentialResponse
+            ?: error("Passkey provider returned ${response::class.java.simpleName}")
+        return api.completePasskeyRegistration(
+            PasskeyCompleteRequest(
+                requestId = options.requestId,
+                credentialJson = credential.registrationResponseJson
             )
         )
     }

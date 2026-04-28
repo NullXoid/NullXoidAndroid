@@ -46,6 +46,35 @@ data class PasskeyCompleteRequest(
 )
 
 @Serializable
+data class PasskeyProviderStatus(
+    val configured: Boolean = false,
+    @SerialName("login_ready") val loginReady: Boolean = false,
+    @SerialName("registration_enabled") val registrationEnabled: Boolean = false,
+    @SerialName("rp_id") val rpId: String? = null,
+    @SerialName("rp_name") val rpName: String? = null,
+    val verification: String? = null
+)
+
+@Serializable
+data class PasskeyCredentialRecord(
+    val id: String = "",
+    @SerialName("credential_id") val credentialId: String,
+    @SerialName("rp_id") val rpId: String = "",
+    @SerialName("sign_count") val signCount: Int = 0,
+    val transports: List<String> = emptyList(),
+    @SerialName("created_at") val createdAt: String = "",
+    @SerialName("updated_at") val updatedAt: String = ""
+)
+
+@Serializable
+data class PasskeyCredentialsResponse(
+    val ok: Boolean = true,
+    val provider: PasskeyProviderStatus? = null,
+    val credential: PasskeyCredentialRecord? = null,
+    val credentials: List<PasskeyCredentialRecord> = emptyList()
+)
+
+@Serializable
 data class OidcStartRequest(
     @SerialName("redirect_uri") val redirectUri: String,
     @SerialName("code_challenge") val codeChallenge: String,

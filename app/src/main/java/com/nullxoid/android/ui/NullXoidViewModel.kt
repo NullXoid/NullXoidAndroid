@@ -15,6 +15,8 @@ import com.nullxoid.android.data.model.ChatRecord
 import com.nullxoid.android.data.model.ChatSession
 import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.ModelDescriptor
+import com.nullxoid.android.data.model.PasskeyCredentialRecord
+import com.nullxoid.android.data.model.PasskeyProviderStatus
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.data.repo.NullXoidRepository
@@ -53,6 +55,9 @@ data class AppUiState(
     val checkingUpdate: Boolean = false,
     val installingUpdate: Boolean = false,
     val updatePromptDismissed: Boolean = false,
+    val passkeyProvider: PasskeyProviderStatus? = null,
+    val passkeyCredentials: List<PasskeyCredentialRecord> = emptyList(),
+    val passkeyLoading: Boolean = false,
     val currentAppVersionName: String = BuildConfig.VERSION_NAME,
     val currentAppVersionCode: Int = BuildConfig.VERSION_CODE
 )
@@ -228,6 +233,79 @@ class NullXoidViewModel(
             runCatching { repo.health() }
                 .onSuccess { _state.value = _state.value.copy(health = it) }
                 .onFailure { t -> _state.value = _state.value.copy(error = t.message) }
+        }
+    }
+
+    fun refreshPasskeys() {
+        if (!_state.value.auth.authenticated) {
+            _state.value = _state.value.copy(
+                passkeyProvider = null,
+                passkeyCredentials = emptyList(),
+                passkeyLoading = false
+            )
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(passkeyLoading = true, error = null)
+            runCatching { repo.passkeyCredentials() }
+                .onSuccess { response ->
+                    _state.value = _state.value.copy(
+                        passkeyLoading = false,
+                        passkeyProvider = response.provider,
+                        passkeyCredentials = response.credentials
+                    )
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        passkeyLoading = false,
+                        error = t.message ?: "Could not load passkeys"
+                    )
+                }
+        }
+    }
+
+    fun registerPasskey(context: Context) {
+        if (!_state.value.auth.authenticated) {
+            _state.value = _state.value.copy(error = "Sign in before adding a passkey")
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(passkeyLoading = true, error = null)
+            runCatching { repo.registerPasskey(context) }
+                .onSuccess { response ->
+                    _state.value = _state.value.copy(
+                        passkeyLoading = false,
+                        passkeyProvider = response.provider ?: _state.value.passkeyProvider,
+                        passkeyCredentials = response.credentials
+                    )
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        passkeyLoading = false,
+                        error = t.message ?: "Passkey enrollment failed"
+                    )
+                }
+        }
+    }
+
+    fun revokePasskey(credentialId: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(passkeyLoading = true, error = null)
+            runCatching { repo.revokePasskey(credentialId) }
+                .onSuccess {
+                    _state.value = _state.value.copy(
+                        passkeyLoading = false,
+                        passkeyCredentials = _state.value.passkeyCredentials
+                            .filterNot { item -> item.credentialId == credentialId }
+                    )
+                    refreshPasskeys()
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        passkeyLoading = false,
+                        error = t.message ?: "Could not remove passkey"
+                    )
+                }
         }
     }
 
@@ -497,6 +575,12 @@ class NullXoidViewModel(
         }
         runCatching { repo.health() }.onSuccess { health ->
             _state.value = _state.value.copy(health = health)
+        }
+        runCatching { repo.passkeyCredentials() }.onSuccess { response ->
+            _state.value = _state.value.copy(
+                passkeyProvider = response.provider,
+                passkeyCredentials = response.credentials
+            )
         }
     }
 
