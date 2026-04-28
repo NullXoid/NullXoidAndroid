@@ -70,6 +70,9 @@ fun SettingsScreen(
     }
     val usesExternalProvider = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_OLLAMA ||
         state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP
+    val backendUrlChanged = urlDraft.trim() != state.backendUrl.trim()
+    val providerSettingsChanged = providerUrlDraft.trim() != state.ollamaUrl.trim() ||
+        providerModelDraft.trim() != state.ollamaModel.trim()
 
     LaunchedEffect(state.auth.authenticated, state.backendUrl) {
         if (state.auth.authenticated) onRefreshPasskeys()
@@ -97,83 +100,6 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .fillMaxSize()
         ) {
-            Text("On-device backend", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Run backend inside this app", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        if (state.embeddedEnabled)
-                            "Running on 127.0.0.1:8090 - $selectedProviderName provider"
-                        else
-                            "Use a remote NullXoid backend via the Base URL below",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                Switch(
-                    modifier = Modifier.testTag("settings-embedded-switch"),
-                    checked = state.embeddedEnabled,
-                    onCheckedChange = onToggleEmbedded
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-            Text("Provider", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_ECHO,
-                    onClick = { onSelectEmbeddedEngine(SettingsStore.EMBEDDED_ENGINE_ECHO) },
-                    label = { Text("Echo") }
-                )
-                FilterChip(
-                    selected = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_OLLAMA,
-                    onClick = { onSelectEmbeddedEngine(SettingsStore.EMBEDDED_ENGINE_OLLAMA) },
-                    label = { Text("Ollama") }
-                )
-                FilterChip(
-                    selected = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP,
-                    onClick = { onSelectEmbeddedEngine(SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP) },
-                    label = { Text("llama.cpp") }
-                )
-            }
-
-            if (usesExternalProvider) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    if (state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP)
-                        "Use this for Termux llama-server, usually http://127.0.0.1:8080."
-                    else
-                        "Use this for Ollama, usually http://127.0.0.1:11434.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = providerUrlDraft,
-                    onValueChange = { providerUrlDraft = it },
-                    label = { Text("$selectedProviderName URL") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = providerModelDraft,
-                    onValueChange = { providerModelDraft = it },
-                    label = { Text("$selectedProviderName model") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { onSaveOllamaSettings(providerUrlDraft, providerModelDraft) }) {
-                    Text("Save $selectedProviderName")
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
             Text("Remote backend", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
@@ -187,20 +113,23 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Use Hosted API for out-of-network phones, or Local/Embedded for development.",
+                "Use Hosted API for normal phone use. Local and Embedded are developer options.",
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(
+                FilterChip(
+                    selected = urlDraft.trim() == SettingsStore.PUBLIC_BACKEND_URL,
                     onClick = { urlDraft = SettingsStore.PUBLIC_BACKEND_URL },
                     label = { Text("Hosted API") }
                 )
-                AssistChip(
+                FilterChip(
+                    selected = urlDraft.trim() == SettingsStore.DEFAULT_BACKEND_URL,
                     onClick = { urlDraft = SettingsStore.DEFAULT_BACKEND_URL },
                     label = { Text("Local") }
                 )
-                AssistChip(
+                FilterChip(
+                    selected = urlDraft.trim() == SettingsStore.EMBEDDED_BACKEND_URL,
                     onClick = { urlDraft = SettingsStore.EMBEDDED_BACKEND_URL },
                     label = { Text("Embedded") }
                 )
@@ -208,7 +137,8 @@ fun SettingsScreen(
             Spacer(Modifier.height(12.dp))
             Button(
                 modifier = Modifier.testTag("settings-save-backend-url"),
-                onClick = { onSave(urlDraft.trim()) }
+                onClick = { onSave(urlDraft.trim()) },
+                enabled = backendUrlChanged
             ) { Text("Save") }
 
             Spacer(Modifier.height(24.dp))
@@ -378,7 +308,87 @@ fun SettingsScreen(
                         !state.installingUpdate
                 ) { Text(if (state.installingUpdate) "Installing" else "Install") }
             }
-            Spacer(Modifier.height(40.dp))
+
+            Spacer(Modifier.height(32.dp))
+            Text("Advanced backend", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Run backend inside this app", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (state.embeddedEnabled)
+                            "Running on 127.0.0.1:8090 - $selectedProviderName provider"
+                        else
+                            "Use a remote NullXoid backend via the Base URL below",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Switch(
+                    modifier = Modifier.testTag("settings-embedded-switch"),
+                    checked = state.embeddedEnabled,
+                    onCheckedChange = onToggleEmbedded
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Text("Provider", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_ECHO,
+                    onClick = { onSelectEmbeddedEngine(SettingsStore.EMBEDDED_ENGINE_ECHO) },
+                    label = { Text("Echo") }
+                )
+                FilterChip(
+                    selected = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_OLLAMA,
+                    onClick = { onSelectEmbeddedEngine(SettingsStore.EMBEDDED_ENGINE_OLLAMA) },
+                    label = { Text("Ollama") }
+                )
+                FilterChip(
+                    selected = state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP,
+                    onClick = { onSelectEmbeddedEngine(SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP) },
+                    label = { Text("llama.cpp") }
+                )
+            }
+
+            if (usesExternalProvider) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    if (state.embeddedEngine == SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP)
+                        "Use this for Termux llama-server, usually http://127.0.0.1:8080."
+                    else
+                        "Use this for Ollama, usually http://127.0.0.1:11434.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = providerUrlDraft,
+                    onValueChange = { providerUrlDraft = it },
+                    label = { Text("$selectedProviderName URL") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = providerModelDraft,
+                    onValueChange = { providerModelDraft = it },
+                    label = { Text("$selectedProviderName model") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { onSaveOllamaSettings(providerUrlDraft, providerModelDraft) },
+                    enabled = providerSettingsChanged
+                ) {
+                    Text("Save $selectedProviderName")
+                }
+            }
+            Spacer(Modifier.height(96.dp))
         }
     }
 }
