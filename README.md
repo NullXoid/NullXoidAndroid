@@ -130,13 +130,14 @@ adb devices -l
 
 If your phone is not listed by `adb devices -l`, enable Developer Options, turn on USB debugging, reconnect USB, and accept the RSA prompt on the phone.
 
-For real-world backend testing on a physical phone:
+For real-world backend testing on a physical phone outside the LAN:
 
-1. Put the phone and backend host on the same reachable network.
-2. Install the debug APK from `app/build/outputs/apk/debug/app-debug.apk`.
-3. Open Settings in the app.
-4. Set `Backend URL` to the phone-reachable backend URL, for example `http://192.168.1.x:8090`.
-5. Save, return to login, sign in, open Health, refresh models, then send a chat message.
+1. Install the debug APK from `app/build/outputs/apk/debug/app-debug.apk`.
+2. Open Settings in the app.
+3. Tap `Hosted API`, which sets `Backend URL` to `https://api.echolabs.diy/nullxoid`.
+4. Save, return to login, sign in, open Health, refresh models, then send a chat message.
+
+For LAN-only development, put the phone and backend host on the same reachable network and set `Backend URL` to a phone-reachable backend URL, for example `http://192.168.1.x:8090`.
 
 Debug builds permit cleartext HTTP so LAN backend testing works. Release builds keep the stricter network security config.
 

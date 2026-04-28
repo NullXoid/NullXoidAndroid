@@ -1,9 +1,22 @@
 package com.nullxoid.android.data.api
 
+import com.nullxoid.android.BuildConfig
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class BackendEndpointTest {
+    @Test
+    fun releasePublicBackendUrlTargetsHostedApi() {
+        assertEquals(
+            "https://api.echolabs.diy/nullxoid",
+            BuildConfig.PUBLIC_BACKEND_URL
+        )
+        assertEquals(
+            BackendEndpoint.PUBLIC_ECHOLABS_URL,
+            BackendEndpoint.normalize(BuildConfig.PUBLIC_BACKEND_URL)
+        )
+    }
+
     @Test
     fun resolvePreservesMountedPublicApiBase() {
         assertEquals(
