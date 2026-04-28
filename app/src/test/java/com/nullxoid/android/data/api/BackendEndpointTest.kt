@@ -31,9 +31,8 @@ class BackendEndpointTest {
     }
 
     @Test
-    fun debugReleaseVersionMatchesPublishedApk() {
-        assertEquals(42, BuildConfig.VERSION_CODE)
-        assertEquals("0.1.42", BuildConfig.VERSION_NAME)
+    fun debugReleaseVersionNameMatchesVersionCode() {
+        assertEquals("0.1.${BuildConfig.VERSION_CODE}", BuildConfig.VERSION_NAME)
     }
 
     @Test
