@@ -51,6 +51,23 @@ The app now has native ceremony plumbing:
 
 If the hosted backend has not been configured with a passkey or OIDC provider yet, these routes must return JSON `501 provider_not_configured` responses. They must never fall through to HTML, a local login page, or a NullBridge privileged route.
 
+## Passkey Domain Association
+
+Native Android passkeys also require a public domain association before a real phone can create credentials for the hosted backend. For the current production backend, publish Digital Asset Links at:
+
+```text
+https://api.echolabs.diy/.well-known/assetlinks.json
+```
+
+The statement must include:
+
+- `relation`: `delegate_permission/common.get_login_creds`
+- `target.namespace`: `android_app`
+- `target.package_name`: `com.nullxoid.android`
+- `target.sha256_cert_fingerprints`: the release signing SHA-256 fingerprint for the build users install
+
+Do not publish a local debug signing fingerprint to the production domain unless the goal is a short-lived physical debug test. After the passkey provider is configured and `assetlinks.json` is live, a physical Android test is required to prove Credential Manager can enroll and sign in with a real passkey.
+
 ## Network Rules
 
 Release builds should use HTTPS or an approved tunnel for remote backends.
