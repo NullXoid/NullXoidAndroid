@@ -43,7 +43,7 @@ Runtime backend URLs should be user-configured in the app or supplied by a contr
 
 ## Backend Configuration
 
-The app defaults to `http://localhost:8090`. Configure `Backend URL` in settings for the backend reachable from your emulator or device.
+The app defaults to the hosted EchoLabs API at `https://api.echolabs.diy/nullxoid`. Configure `Backend URL` in settings when testing a local, LAN, or embedded backend.
 
 You can change the backend URL from the in-app Settings screen.
 

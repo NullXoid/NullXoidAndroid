@@ -81,7 +81,7 @@ class SettingsStore(private val context: Context) {
     companion object {
         val DEFAULT_BACKEND_URL: String = BackendEndpoint.normalize(
             BuildConfig.DEFAULT_BACKEND_URL,
-            BackendEndpoint.LOCAL_DEFAULT_URL
+            BackendEndpoint.PUBLIC_ECHOLABS_URL
         )
         val PUBLIC_BACKEND_URL: String = BackendEndpoint.normalize(
             BuildConfig.PUBLIC_BACKEND_URL,

@@ -14,7 +14,7 @@ android {
 
     val defaultBackendUrl = providers.gradleProperty("NULLXOID_DEFAULT_BACKEND_URL")
         .orElse(providers.environmentVariable("NULLXOID_DEFAULT_BACKEND_URL"))
-        .getOrElse("http://localhost:8090")
+        .getOrElse("https://api.echolabs.diy/nullxoid")
     val publicBackendUrl = providers.gradleProperty("NULLXOID_PUBLIC_BACKEND_URL")
         .orElse(providers.environmentVariable("NULLXOID_PUBLIC_BACKEND_URL"))
         .getOrElse("https://api.echolabs.diy/nullxoid")

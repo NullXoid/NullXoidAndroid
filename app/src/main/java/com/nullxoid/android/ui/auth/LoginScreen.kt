@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
@@ -11,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -64,10 +66,21 @@ fun LoginScreen(
         ) {
             Text("Sign in", style = androidx.compose.material3.MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(8.dp))
-            Text(
-                state.backendUrl.ifEmpty { "(no backend configured)" },
-                style = androidx.compose.material3.MaterialTheme.typography.bodySmall
-            )
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("Backend", style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        state.backendUrl.ifEmpty { "No backend configured" },
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(
+                        modifier = Modifier.testTag("login-backend-card-button"),
+                        onClick = onOpenSettings
+                    ) { Text("Change backend") }
+                }
+            }
             Spacer(Modifier.height(16.dp))
             Button(
                 modifier = Modifier.testTag("login-passkey"),

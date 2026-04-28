@@ -19,6 +19,18 @@ class BackendEndpointTest {
     }
 
     @Test
+    fun defaultBackendUrlTargetsHostedApiForNewInstalls() {
+        assertEquals(
+            "https://api.echolabs.diy/nullxoid",
+            BuildConfig.DEFAULT_BACKEND_URL
+        )
+        assertEquals(
+            BackendEndpoint.PUBLIC_ECHOLABS_URL,
+            SettingsStore.DEFAULT_BACKEND_URL
+        )
+    }
+
+    @Test
     fun resolvePreservesMountedPublicApiBase() {
         assertEquals(
             "https://api.echolabs.diy/nullxoid/auth/login",
