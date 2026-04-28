@@ -68,6 +68,24 @@ The statement must include:
 
 Do not publish a local debug signing fingerprint to the production domain unless the goal is a short-lived physical debug test. After the passkey provider is configured and `assetlinks.json` is live, a physical Android test is required to prove Credential Manager can enroll and sign in with a real passkey.
 
+Generate the JSON from the fingerprint of the APK users will install:
+
+```powershell
+python scripts/generate_assetlinks.py `
+  --apk app/build/outputs/apk/debug/app-debug.apk `
+  --apksigner "$env:LOCALAPPDATA\Android\Sdk\build-tools\36.1.0\apksigner.bat"
+```
+
+For production, prefer passing the release signing fingerprint directly:
+
+```powershell
+python scripts/generate_assetlinks.py `
+  --fingerprint "AA:BB:CC:..." `
+  --output assetlinks.json
+```
+
+Publish the generated file to the EchoLabs platform domain that owns the passkey RP ID. For the current hosted API route, that is `api.echolabs.diy`.
+
 ## Network Rules
 
 Release builds should use HTTPS or an approved tunnel for remote backends.
