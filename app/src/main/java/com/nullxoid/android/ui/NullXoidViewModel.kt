@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.nullxoid.android.BuildConfig
 import com.nullxoid.android.backend.BackendService
+import com.nullxoid.android.data.api.ApiException
 import com.nullxoid.android.data.auth.OidcLaunch
 import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.ChatMessage
@@ -37,6 +38,8 @@ private const val OIDC_REDIRECT_URI = "nullxoid://auth/oidc/callback"
 internal fun mobilePasskeySignInError(t: Throwable): String {
     val details = listOfNotNull(t.message, t::class.simpleName).joinToString(" ").lowercase()
     return when {
+        t is ApiException && t.code == 401 && "passkey_credential_not_registered" in t.body ->
+            "This passkey is not registered for this account. Sign in with password, remove the stale NullXoid passkey from Google Password Manager or Samsung Pass, then add a new passkey in Settings."
         "nocredential" in details || "no credential" in details || "no available" in details ->
             "No saved passkey was found for this phone. Sign in with password once, then open Settings > Account security > Add passkey."
         "rp id" in details || "rpid" in details || "relying party" in details || "validate" in details ->
@@ -49,6 +52,18 @@ internal fun mobilePasskeySignInError(t: Throwable): String {
     }
 }
 
+internal fun mobilePasskeyRegistrationError(t: Throwable): String {
+    val details = listOfNotNull(t.message, t::class.simpleName).joinToString(" ").lowercase()
+    return when {
+        "rp id" in details || "rpid" in details || "relying party" in details || "validate" in details ->
+            "Android could not validate the echolabs.diy passkey domain for this app. Confirm version 0.1.46 or newer is installed, then try Add passkey again."
+        "cancel" in details -> "Passkey setup was cancelled."
+        "unsupported" in details || "provider" in details ->
+            "This phone does not have a usable passkey provider enabled. Enable Google Password Manager or Samsung Pass, then try again."
+        else -> t.message ?: "Passkey setup failed. Try Google Password Manager first; Samsung Pass can be tested separately."
+    }
+}
+
 internal fun passkeyEnrollmentStatusText(
     authenticated: Boolean,
     provider: PasskeyProviderStatus?,
@@ -56,7 +71,7 @@ internal fun passkeyEnrollmentStatusText(
 ): String = when {
     !authenticated -> "Sign in with password once to add a passkey on this phone."
     provider?.registrationEnabled == true && credentialCount > 0 ->
-        "This phone has $credentialCount passkey(s). You can sign in with passkey next time."
+        "This account has $credentialCount passkey(s). This phone can sign in only after Android saves one for NullXoid."
     provider?.registrationEnabled == true ->
         "Signed in. Add a passkey here so this phone can use passkey sign-in next time."
     provider?.configured == true -> "Passkey enrollment is disabled by the backend."
@@ -317,7 +332,7 @@ class NullXoidViewModel(
                 .onFailure { t ->
                     _state.value = _state.value.copy(
                         passkeyLoading = false,
-                        error = t.message ?: "Passkey enrollment failed"
+                        error = mobilePasskeyRegistrationError(t)
                     )
                 }
         }

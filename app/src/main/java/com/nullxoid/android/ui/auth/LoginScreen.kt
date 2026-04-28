@@ -6,8 +6,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -60,10 +64,14 @@ fun LoginScreen(
             modifier = Modifier
                 .padding(inner)
                 .padding(24.dp)
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
                 .fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(Modifier.height(48.dp))
             Text("Sign in", style = androidx.compose.material3.MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(8.dp))
             OutlinedCard(Modifier.fillMaxWidth()) {
@@ -136,6 +144,7 @@ fun LoginScreen(
                 Spacer(Modifier.height(16.dp))
                 Text(err, color = androidx.compose.material3.MaterialTheme.colorScheme.error)
             }
+            Spacer(Modifier.height(32.dp))
         }
     }
 }

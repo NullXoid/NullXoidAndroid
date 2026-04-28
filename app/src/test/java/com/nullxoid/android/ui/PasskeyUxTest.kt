@@ -1,6 +1,7 @@
 package com.nullxoid.android.ui
 
 import androidx.credentials.exceptions.NoCredentialException
+import com.nullxoid.android.data.api.ApiException
 import com.nullxoid.android.data.model.PasskeyProviderStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -37,12 +38,25 @@ class PasskeyUxTest {
         )
 
         assertEquals(
-            "This phone has 1 passkey(s). You can sign in with passkey next time.",
+            "This account has 1 passkey(s). This phone can sign in only after Android saves one for NullXoid.",
             passkeyEnrollmentStatusText(
                 authenticated = true,
                 provider = provider,
                 credentialCount = 1
             )
         )
+    }
+
+    @Test
+    fun unregisteredCredentialErrorExplainsStaleDevicePasskey() {
+        val message = mobilePasskeySignInError(
+            ApiException(
+                401,
+                "{\"detail\":{\"code\":\"passkey_credential_not_registered\"}}"
+            )
+        )
+
+        assertTrue(message.contains("not registered"))
+        assertTrue(message.contains("remove the stale NullXoid passkey"))
     }
 }
