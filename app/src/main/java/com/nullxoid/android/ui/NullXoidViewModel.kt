@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.nullxoid.android.BuildConfig
 import com.nullxoid.android.backend.BackendService
+import com.nullxoid.android.data.auth.OidcLaunch
 import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.ChatMessage
 import com.nullxoid.android.data.model.ChatRecord
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
+private const val OIDC_REDIRECT_URI = "nullxoid://auth/oidc/callback"
 
 data class AppUiState(
     val auth: AuthState = AuthState(),
@@ -66,6 +68,7 @@ class NullXoidViewModel(
 
     private var streamJob: Job? = null
     private var updateCheckJob: Job? = null
+    private var pendingOidcLaunch: OidcLaunch? = null
 
     fun bootstrap() {
         viewModelScope.launch {
@@ -114,6 +117,80 @@ class NullXoidViewModel(
                 .onFailure { t ->
                     _state.value = _state.value.copy(loading = false, error = t.message)
                 }
+        }
+    }
+
+    fun loginWithPasskey(context: Context) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null)
+            runCatching { repo.loginWithPasskey(context) }
+                .onSuccess { auth ->
+                    _state.value = _state.value.copy(loading = false, auth = auth)
+                    refreshPostLogin()
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        error = t.message ?: "Passkey sign-in is not configured"
+                    )
+                }
+        }
+    }
+
+    fun startOidcSignIn() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null)
+            runCatching { repo.startOidcSignIn(OIDC_REDIRECT_URI) }
+                .onSuccess { launch ->
+                    pendingOidcLaunch = launch
+                    _state.value = _state.value.copy(loading = false)
+                    openExternalUrl(launch.authorizationUrl)
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        error = t.message ?: "OIDC sign-in is not configured"
+                    )
+                }
+        }
+    }
+
+    fun completeOidcSignIn(uri: Uri?) {
+        if (uri == null) return
+        val launch = pendingOidcLaunch
+        val code = uri.getQueryParameter("code")
+        val state = uri.getQueryParameter("state")
+        if (launch == null) {
+            _state.value = _state.value.copy(error = "OIDC callback arrived without a pending sign-in")
+            return
+        }
+        if (code.isNullOrBlank() || state.isNullOrBlank()) {
+            _state.value = _state.value.copy(error = "OIDC callback was missing code or state")
+            return
+        }
+        if (state != launch.state) {
+            _state.value = _state.value.copy(error = "OIDC state mismatch")
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null)
+            runCatching {
+                repo.completeOidcSignIn(
+                    code = code,
+                    state = state,
+                    redirectUri = launch.redirectUri,
+                    codeVerifier = launch.codeVerifier
+                )
+            }.onSuccess { auth ->
+                pendingOidcLaunch = null
+                _state.value = _state.value.copy(loading = false, auth = auth)
+                refreshPostLogin()
+            }.onFailure { t ->
+                _state.value = _state.value.copy(
+                    loading = false,
+                    error = t.message ?: "OIDC sign-in failed"
+                )
+            }
         }
     }
 

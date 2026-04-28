@@ -73,13 +73,13 @@ fun LoginScreen(
                 modifier = Modifier.testTag("login-passkey"),
                 onClick = onPasskeySetup,
                 enabled = !state.loading
-            ) { Text("Set up passkey sign-in") }
+            ) { Text("Sign in with passkey") }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 modifier = Modifier.testTag("login-oidc"),
                 onClick = onOidcSetup,
                 enabled = !state.loading
-            ) { Text("Set up OIDC") }
+            ) { Text("Continue with OIDC") }
             Spacer(Modifier.height(16.dp))
             Text(
                 "Password fallback is for development or migration only.",

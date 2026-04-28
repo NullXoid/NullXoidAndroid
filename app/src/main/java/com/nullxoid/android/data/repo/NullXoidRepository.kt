@@ -1,8 +1,11 @@
 package com.nullxoid.android.data.repo
 
+import android.content.Context
 import com.nullxoid.android.data.api.ChatStream
 import com.nullxoid.android.data.api.BackendEndpoint
 import com.nullxoid.android.data.api.NullXoidApi
+import com.nullxoid.android.data.auth.NativeAuthCoordinator
+import com.nullxoid.android.data.auth.OidcLaunch
 import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.ChatCreateRequest
 import com.nullxoid.android.data.model.ChatMessage
@@ -10,6 +13,7 @@ import com.nullxoid.android.data.model.ChatRecord
 import com.nullxoid.android.data.model.ChatStreamRequest
 import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.ModelDescriptor
+import com.nullxoid.android.data.model.OidcCompleteRequest
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +30,7 @@ class NullXoidRepository(
     private val settingsStore: SettingsStore
 ) {
     private val api = NullXoidApi { currentBaseUrl }
+    private val nativeAuth = NativeAuthCoordinator(api)
     private val chatStream = ChatStream { currentBaseUrl }
 
     @Volatile
@@ -59,6 +64,37 @@ class NullXoidRepository(
         val state = api.login(username, password)
         _auth.value = state
         return state
+    }
+
+    suspend fun loginWithPasskey(context: Context): AuthState {
+        refreshBaseUrl()
+        val state = nativeAuth.signInWithPasskey(context)
+        _auth.value = state
+        return state
+    }
+
+    suspend fun startOidcSignIn(redirectUri: String): OidcLaunch {
+        refreshBaseUrl()
+        return nativeAuth.startOidcSignIn(redirectUri)
+    }
+
+    suspend fun completeOidcSignIn(
+        code: String,
+        state: String,
+        redirectUri: String,
+        codeVerifier: String
+    ): AuthState {
+        refreshBaseUrl()
+        val authState = api.completeOidc(
+            OidcCompleteRequest(
+                code = code,
+                state = state,
+                redirectUri = redirectUri,
+                codeVerifier = codeVerifier
+            )
+        )
+        _auth.value = authState
+        return authState
     }
 
     suspend fun logout() {

@@ -7,6 +7,11 @@ import com.nullxoid.android.data.model.ChatRecord
 import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.LoginRequest
 import com.nullxoid.android.data.model.ModelListResponse
+import com.nullxoid.android.data.model.OidcCompleteRequest
+import com.nullxoid.android.data.model.OidcStartRequest
+import com.nullxoid.android.data.model.OidcStartResponse
+import com.nullxoid.android.data.model.PasskeyCompleteRequest
+import com.nullxoid.android.data.model.PasskeyOptionsResponse
 import com.nullxoid.android.data.model.RemoteSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -82,6 +87,17 @@ class NullXoidApi(
 
     suspend fun login(username: String, password: String): AuthState =
         sendJson("POST", "/auth/login", LoginRequest(username, password))
+
+    suspend fun passkeyOptions(): PasskeyOptionsResponse = getJson("/auth/passkey/options")
+
+    suspend fun completePasskey(request: PasskeyCompleteRequest): AuthState =
+        sendJson("POST", "/auth/passkey/complete", request)
+
+    suspend fun startOidc(request: OidcStartRequest): OidcStartResponse =
+        sendJson("POST", "/auth/oidc/start", request)
+
+    suspend fun completeOidc(request: OidcCompleteRequest): AuthState =
+        sendJson("POST", "/auth/oidc/complete", request)
 
     suspend fun logout() {
         sendNoBody("POST", "/auth/logout")

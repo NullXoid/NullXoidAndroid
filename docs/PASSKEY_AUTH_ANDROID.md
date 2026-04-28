@@ -37,6 +37,17 @@ OIDC Authorization Code with PKCE is allowed when the backend is configured for 
 
 Password sign-in remains a development or migration fallback only. Admin accounts must not be password-only.
 
+## Native Ceremony Contract
+
+The app now has native ceremony plumbing:
+
+- `Sign in with passkey` calls Android Credential Manager and sends the assertion to `/auth/passkey/complete`.
+- `Continue with OIDC` starts Authorization Code with PKCE at `/auth/oidc/start`.
+- The OIDC callback returns to `nullxoid://auth/oidc/callback`.
+- The app verifies the OIDC state before exchanging the code at `/auth/oidc/complete`.
+
+If the hosted backend has not been configured with a passkey or OIDC provider yet, these routes must return JSON `501 provider_not_configured` responses. They must never fall through to HTML, a local login page, or a NullBridge privileged route.
+
 ## Network Rules
 
 Release builds should use HTTPS or an approved tunnel for remote backends.
@@ -49,7 +60,7 @@ AIBenchie should fail Android release gates if:
 
 - the app receives NullBridge service credentials
 - Android calls privileged NullBridge routes directly
-- passkey/OIDC setup is missing
+- passkey/OIDC setup or native ceremony wiring is missing
 - tokens are sent in URLs
 - password-only admin sign-in is enabled
 - release networking depends on local cleartext

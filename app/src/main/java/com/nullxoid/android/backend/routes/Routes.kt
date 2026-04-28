@@ -56,11 +56,41 @@ private fun Route.authRoutes(store: EmbeddedStore) {
         call.respond(store.login(req.username, req.password))
     }
 
+    get("/auth/passkey/options") {
+        call.respond(HttpStatusCode.NotImplemented, nativeAuthNotConfigured("passkey"))
+    }
+
+    post("/auth/passkey/complete") {
+        call.respond(HttpStatusCode.NotImplemented, nativeAuthNotConfigured("passkey"))
+    }
+
+    post("/auth/oidc/start") {
+        call.respond(HttpStatusCode.NotImplemented, nativeAuthNotConfigured("oidc_pkce"))
+    }
+
+    post("/auth/oidc/complete") {
+        call.respond(HttpStatusCode.NotImplemented, nativeAuthNotConfigured("oidc_pkce"))
+    }
+
     post("/auth/logout") {
         store.logout()
         call.respond(HttpStatusCode.OK, buildJsonObject { put("ok", true) })
     }
 }
+
+private fun nativeAuthNotConfigured(method: String): JsonObject =
+    buildJsonObject {
+        put(
+            "detail",
+            buildJsonObject {
+                put("code", "${method}_provider_not_configured")
+                put("auth_method", method)
+                put("configured", false)
+                put("setup_required", true)
+                put("setup_route", "settings:accounts_security")
+            }
+        )
+    }
 
 private fun Route.healthRoutes(engine: LlmEngine) {
     get("/health/features") {

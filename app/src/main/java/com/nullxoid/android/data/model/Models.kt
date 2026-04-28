@@ -32,6 +32,41 @@ data class LoginRequest(
 )
 
 @Serializable
+data class PasskeyOptionsResponse(
+    @SerialName("request_id") val requestId: String,
+    @SerialName("request_json") val requestJson: String? = null,
+    @SerialName("public_key") val publicKeySnake: JsonObject? = null,
+    val publicKey: JsonObject? = null
+)
+
+@Serializable
+data class PasskeyCompleteRequest(
+    @SerialName("request_id") val requestId: String,
+    @SerialName("credential_json") val credentialJson: String
+)
+
+@Serializable
+data class OidcStartRequest(
+    @SerialName("redirect_uri") val redirectUri: String,
+    @SerialName("code_challenge") val codeChallenge: String,
+    @SerialName("code_challenge_method") val codeChallengeMethod: String = "S256"
+)
+
+@Serializable
+data class OidcStartResponse(
+    @SerialName("authorization_url") val authorizationUrl: String,
+    val state: String
+)
+
+@Serializable
+data class OidcCompleteRequest(
+    val code: String,
+    val state: String,
+    @SerialName("redirect_uri") val redirectUri: String,
+    @SerialName("code_verifier") val codeVerifier: String
+)
+
+@Serializable
 data class ModelDescriptor(
     val id: String,
     val name: String? = null,

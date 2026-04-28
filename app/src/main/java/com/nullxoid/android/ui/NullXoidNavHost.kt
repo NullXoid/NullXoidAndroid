@@ -1,5 +1,6 @@
 package com.nullxoid.android.ui
 
+import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -11,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -32,14 +34,26 @@ object Routes {
 }
 
 @Composable
-fun NullXoidApp(app: NullXoidApplication) {
+fun NullXoidApp(
+    app: NullXoidApplication,
+    oidcRedirect: Uri? = null,
+    onOidcRedirectConsumed: () -> Unit = {}
+) {
     val vm: NullXoidViewModel = viewModel(
         factory = NullXoidViewModel.Factory(app.repository, app, app.settingsStore)
     )
     val state by vm.state.collectAsState()
     val nav = rememberNavController()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) { vm.bootstrap() }
+
+    LaunchedEffect(oidcRedirect) {
+        if (oidcRedirect != null) {
+            vm.completeOidcSignIn(oidcRedirect)
+            onOidcRedirectConsumed()
+        }
+    }
 
     LaunchedEffect(state.auth.authenticated) {
         val current = nav.currentBackStackEntry?.destination?.route
@@ -66,8 +80,8 @@ fun NullXoidApp(app: NullXoidApplication) {
                         state = state,
                         onLogin = vm::login,
                         onOpenSettings = { nav.navigate(Routes.Settings) },
-                        onPasskeySetup = { nav.navigate(Routes.Settings) },
-                        onOidcSetup = { nav.navigate(Routes.Settings) }
+                        onPasskeySetup = { vm.loginWithPasskey(context) },
+                        onOidcSetup = vm::startOidcSignIn
                     )
                 }
                 composable(Routes.ChatList) {
