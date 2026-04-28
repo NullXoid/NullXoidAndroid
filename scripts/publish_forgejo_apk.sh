@@ -127,7 +127,7 @@ PY
     curl -fsS -X DELETE \
       -H "Authorization: token ${FORGEJO_TOKEN}" \
       -H "Accept: application/json" \
-      "${api}/releases/assets/${asset_id}" \
+      "${api}/releases/${release_id}/assets/${asset_id}" \
       >/dev/null
   fi
 
