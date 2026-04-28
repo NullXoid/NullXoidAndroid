@@ -85,7 +85,7 @@ publish_release() {
   local api="${FORGEJO_API%/}/repos/${FORGEJO_REPO}"
   local response payload release_id asset_id
 
-  response="$(curl -fsS \
+  response="$(curl -fs \
     -H "Authorization: token ${FORGEJO_TOKEN}" \
     -H "Accept: application/json" \
     "${api}/releases/tags/${tag}" || true)"
@@ -113,7 +113,28 @@ PY
       -d "$payload" \
       "${api}/releases")"
   else
-    log "updating Forgejo release asset on $tag"
+    payload="$(TAG="$tag" NAME="$name" BODY="$body" TARGET_COMMITISH="$TARGET_COMMITISH" python3 - <<'PY'
+import json
+import os
+
+print(json.dumps({
+    "tag_name": os.environ["TAG"],
+    "target_commitish": os.environ.get("TARGET_COMMITISH", ""),
+    "name": os.environ["NAME"],
+    "body": os.environ["BODY"],
+    "draft": False,
+    "prerelease": True,
+}))
+PY
+)"
+    release_id="$(printf '%s' "$response" | json_field id)"
+    log "updating Forgejo release $tag"
+    response="$(curl -fsS -X PATCH \
+      -H "Authorization: token ${FORGEJO_TOKEN}" \
+      -H "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      -d "$payload" \
+      "${api}/releases/${release_id}")"
   fi
 
   release_id="$(printf '%s' "$response" | json_field id)"
