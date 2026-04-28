@@ -96,7 +96,7 @@ Android will only update an installed package when the new APK is signed with th
 - `NULLXOID_SIGNING_KEY_ALIAS`
 - `NULLXOID_SIGNING_KEY_PASSWORD`
 
-Forgejo release publishing also needs `FORGEJO_TOKEN`, scoped to create/update releases in the `EchoLabs/NullXoidAndroid` repository. The update checker can be pointed at another release source with:
+Forgejo release publishing also needs a token scoped to create/update releases in the `EchoLabs/NullXoidAndroid` repository. Set `FORGEJO_TOKEN` for one shell or store it in a root-only file at `/root/.config/nullxoid/forgejo-token`. The update checker can be pointed at another release source with:
 
 - `NULLXOID_APP_UPDATE_RELEASES_URL`
 - `NULLXOID_APP_UPDATE_RELEASE_PAGE_BASE`
@@ -106,7 +106,9 @@ Forgejo release publishing also needs `FORGEJO_TOKEN`, scoped to create/update r
 To seed Forgejo before the first successful Forgejo Actions run, publish an existing APK directly:
 
 ```bash
-export FORGEJO_TOKEN="..."
+install -d -m 0700 /root/.config/nullxoid
+printf '%s' 'FORGEJO_TOKEN_VALUE' > /root/.config/nullxoid/forgejo-token
+chmod 0600 /root/.config/nullxoid/forgejo-token
 APK_URL="https://github.com/NullXoid/NullXoidAndroid/releases/download/v0.1.37/NullXoidAndroid-debug.apk" \
 VERSION_TAG="v0.1.37" \
 scripts/publish_forgejo_apk.sh

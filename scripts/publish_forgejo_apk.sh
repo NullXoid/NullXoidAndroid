@@ -4,6 +4,7 @@ set -euo pipefail
 FORGEJO_API="${FORGEJO_API:-http://git.echolabs.diy/api/v1}"
 FORGEJO_REPO="${FORGEJO_REPO:-EchoLabs/NullXoidAndroid}"
 FORGEJO_TOKEN="${FORGEJO_TOKEN:-}"
+FORGEJO_TOKEN_FILE="${FORGEJO_TOKEN_FILE:-/root/.config/nullxoid/forgejo-token}"
 APK_NAME="${APK_NAME:-NullXoidAndroid-debug.apk}"
 APK_PATH="${APK_PATH:-release/$APK_NAME}"
 APK_URL="${APK_URL:-}"
@@ -14,6 +15,15 @@ TARGET_COMMITISH="${TARGET_COMMITISH:-$(git rev-parse HEAD 2>/dev/null || true)}
 
 log() {
   printf '[%s] %s\n' "$(date -Is)" "$*"
+}
+
+load_token_file() {
+  if [ -n "$FORGEJO_TOKEN" ]; then
+    return 0
+  fi
+  if [ -n "$FORGEJO_TOKEN_FILE" ] && [ -f "$FORGEJO_TOKEN_FILE" ]; then
+    FORGEJO_TOKEN="$(tr -d '\r\n' < "$FORGEJO_TOKEN_FILE")"
+  fi
 }
 
 json_field() {
@@ -33,11 +43,18 @@ for asset in data.get("assets", []):
 }
 
 require_token() {
+  load_token_file
   if [ -z "$FORGEJO_TOKEN" ]; then
     cat >&2 <<'EOF'
 FORGEJO_TOKEN is required.
 
-Create a Forgejo token with repository release write access, then run for example:
+Create a Forgejo token with repository release write access, then either store it once:
+
+  install -d -m 0700 /root/.config/nullxoid
+  printf '%s' 'TOKEN' > /root/.config/nullxoid/forgejo-token
+  chmod 0600 /root/.config/nullxoid/forgejo-token
+
+or export it for one shell:
 
   export FORGEJO_TOKEN='...'
   APK_URL='https://github.com/NullXoid/NullXoidAndroid/releases/download/v0.1.37/NullXoidAndroid-debug.apk' \
