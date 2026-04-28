@@ -49,6 +49,7 @@ fun SettingsScreen(
     onToggleEmbedded: (Boolean) -> Unit,
     onSelectEmbeddedEngine: (String) -> Unit,
     onSaveOllamaSettings: (String, String) -> Unit,
+    onSelectUpdateSource: (String) -> Unit,
     onCheckForUpdate: () -> Unit,
     onOpenUpdateReleasePage: () -> Unit,
     onInstallUpdate: () -> Unit,
@@ -293,6 +294,35 @@ fun SettingsScreen(
             Spacer(Modifier.height(24.dp))
             Text("App update", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
+            Text("Release channel", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = state.updateSource == SettingsStore.UPDATE_SOURCE_AUTO,
+                    onClick = { onSelectUpdateSource(SettingsStore.UPDATE_SOURCE_AUTO) },
+                    label = { Text("Auto") }
+                )
+                FilterChip(
+                    selected = state.updateSource == SettingsStore.UPDATE_SOURCE_FORGEJO,
+                    onClick = { onSelectUpdateSource(SettingsStore.UPDATE_SOURCE_FORGEJO) },
+                    label = { Text("Forgejo") }
+                )
+                FilterChip(
+                    selected = state.updateSource == SettingsStore.UPDATE_SOURCE_GITHUB,
+                    onClick = { onSelectUpdateSource(SettingsStore.UPDATE_SOURCE_GITHUB) },
+                    label = { Text("GitHub") }
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                when (state.updateSource) {
+                    SettingsStore.UPDATE_SOURCE_FORGEJO -> "Use EchoLabs Forgejo releases only."
+                    SettingsStore.UPDATE_SOURCE_GITHUB -> "Use the public GitHub mirror only."
+                    else -> "Try EchoLabs Forgejo first, then GitHub mirror."
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
+            Spacer(Modifier.height(12.dp))
             val updateInfo = state.updateInfo
             Text(
                 "Installed: ${state.currentAppVersionName} (${state.currentAppVersionCode})",

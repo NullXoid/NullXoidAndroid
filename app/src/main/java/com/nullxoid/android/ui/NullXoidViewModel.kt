@@ -51,6 +51,7 @@ data class AppUiState(
     val embeddedEngine: String = SettingsStore.EMBEDDED_ENGINE_ECHO,
     val ollamaUrl: String = SettingsStore.DEFAULT_OLLAMA_URL,
     val ollamaModel: String = SettingsStore.DEFAULT_OLLAMA_MODEL,
+    val updateSource: String = SettingsStore.UPDATE_SOURCE_AUTO,
     val updateInfo: AppUpdateInfo? = null,
     val checkingUpdate: Boolean = false,
     val installingUpdate: Boolean = false,
@@ -86,6 +87,8 @@ class NullXoidViewModel(
                 .getOrDefault(SettingsStore.DEFAULT_OLLAMA_URL)
             val ollamaModel = runCatching { settingsStore.ollamaModel.first() }
                 .getOrDefault(SettingsStore.DEFAULT_OLLAMA_MODEL)
+            val updateSource = runCatching { settingsStore.updateSource.first() }
+                .getOrDefault(SettingsStore.UPDATE_SOURCE_AUTO)
             if (embedded) ensureBackendRunning()
             val auth = runCatching { repo.bootstrap() }.getOrElse { AuthState() }
             _state.value = _state.value.copy(
@@ -94,6 +97,7 @@ class NullXoidViewModel(
                 embeddedEngine = embeddedEngine,
                 ollamaUrl = ollamaUrl,
                 ollamaModel = ollamaModel,
+                updateSource = updateSource,
                 auth = auth,
                 backendUrl = url,
                 selectedModel = repo.selectedModel()
@@ -435,7 +439,7 @@ class NullXoidViewModel(
                 checkingUpdate = showErrors,
                 error = if (showErrors) null else _state.value.error
             )
-            runCatching { AppUpdateChecker().checkLatestDebugRelease() }
+            runCatching { AppUpdateChecker(_state.value.updateSource).checkLatestDebugRelease() }
                 .onSuccess { info ->
                     val shouldResetPrompt =
                         info.updateAvailable &&
@@ -464,11 +468,17 @@ class NullXoidViewModel(
     fun openUpdateReleasePage() {
         openExternalUrl(
             _state.value.updateInfo?.releasePageUrl
-                ?: BuildConfig.APP_UPDATE_RELEASE_PAGE_BASE.ifBlank {
-                    BuildConfig.APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE
-                }
+                ?: defaultUpdateReleasePage()
         )
     }
+
+    private fun defaultUpdateReleasePage(): String =
+        when (SettingsStore.normalizeUpdateSource(_state.value.updateSource)) {
+            SettingsStore.UPDATE_SOURCE_GITHUB -> BuildConfig.APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE
+            else -> BuildConfig.APP_UPDATE_RELEASE_PAGE_BASE.ifBlank {
+                BuildConfig.APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE
+            }
+        }
 
     fun installLatestUpdate() {
         val url = _state.value.updateInfo?.apkDownloadUrl
@@ -520,6 +530,19 @@ class NullXoidViewModel(
             } else {
                 stopBackend()
             }
+        }
+    }
+
+    fun setUpdateSource(source: String) {
+        val normalized = SettingsStore.normalizeUpdateSource(source)
+        viewModelScope.launch {
+            settingsStore.setUpdateSource(normalized)
+            _state.value = _state.value.copy(
+                updateSource = normalized,
+                updateInfo = null,
+                updatePromptDismissed = false
+            )
+            checkForUpdateSilently()
         }
     }
 

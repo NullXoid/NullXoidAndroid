@@ -1,6 +1,7 @@
 package com.nullxoid.android.data.update
 
 import com.nullxoid.android.BuildConfig
+import com.nullxoid.android.data.prefs.SettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -22,6 +23,7 @@ data class AppUpdateInfo(
 )
 
 class AppUpdateChecker(
+    private val sourcePreference: String = SettingsStore.UPDATE_SOURCE_AUTO,
     private val client: OkHttpClient = OkHttpClient()
 ) {
     suspend fun checkLatestDebugRelease(): AppUpdateInfo = withContext(Dispatchers.IO) {
@@ -66,18 +68,23 @@ class AppUpdateChecker(
         }
     }
 
-    private fun updateSources(): List<UpdateSource> = listOf(
-        UpdateSource(
+    private fun updateSources(): List<UpdateSource> {
+        val forgejo = UpdateSource(
             name = "Forgejo",
             releasesUrl = BuildConfig.APP_UPDATE_RELEASES_URL,
             releasePageBase = BuildConfig.APP_UPDATE_RELEASE_PAGE_BASE
-        ),
-        UpdateSource(
+        )
+        val github = UpdateSource(
             name = "GitHub mirror",
             releasesUrl = BuildConfig.APP_UPDATE_FALLBACK_RELEASES_URL,
             releasePageBase = BuildConfig.APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE
         )
-    ).filter { it.releasesUrl.isNotBlank() }
+        return when (SettingsStore.normalizeUpdateSource(sourcePreference)) {
+            SettingsStore.UPDATE_SOURCE_FORGEJO -> listOf(forgejo)
+            SettingsStore.UPDATE_SOURCE_GITHUB -> listOf(github)
+            else -> listOf(forgejo, github)
+        }.filter { it.releasesUrl.isNotBlank() }
+    }
 
     private fun JSONArray.versionedReleases(source: UpdateSource): List<ReleaseCandidate> = buildList {
         for (i in 0 until length()) {

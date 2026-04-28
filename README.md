@@ -103,6 +103,15 @@ Forgejo release publishing also needs `FORGEJO_TOKEN`, scoped to create/update r
 - `NULLXOID_APP_UPDATE_FALLBACK_RELEASES_URL`
 - `NULLXOID_APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE`
 
+To seed Forgejo before the first successful Forgejo Actions run, publish an existing APK directly:
+
+```bash
+export FORGEJO_TOKEN="..."
+APK_URL="https://github.com/NullXoid/NullXoidAndroid/releases/download/v0.1.37/NullXoidAndroid-debug.apk" \
+VERSION_TAG="v0.1.37" \
+scripts/publish_forgejo_apk.sh
+```
+
 ## Run
 
 1. Start the NullXoid backend.

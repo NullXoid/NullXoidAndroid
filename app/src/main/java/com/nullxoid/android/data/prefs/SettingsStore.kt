@@ -20,6 +20,7 @@ class SettingsStore(private val context: Context) {
     private val embeddedEngineKey = stringPreferencesKey("embedded_engine")
     private val ollamaUrlKey = stringPreferencesKey("ollama_url")
     private val ollamaModelKey = stringPreferencesKey("ollama_model")
+    private val updateSourceKey = stringPreferencesKey("update_source")
 
     val backendUrl: Flow<String> = context.settingsDataStore.data.map {
         it[backendUrlKey] ?: DEFAULT_BACKEND_URL
@@ -43,6 +44,10 @@ class SettingsStore(private val context: Context) {
 
     val ollamaModel: Flow<String> = context.settingsDataStore.data.map {
         it[ollamaModelKey] ?: DEFAULT_OLLAMA_MODEL
+    }
+
+    val updateSource: Flow<String> = context.settingsDataStore.data.map {
+        normalizeUpdateSource(it[updateSourceKey])
     }
 
     suspend fun setBackendUrl(url: String) {
@@ -69,6 +74,10 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[ollamaModelKey] = model }
     }
 
+    suspend fun setUpdateSource(source: String) {
+        context.settingsDataStore.edit { it[updateSourceKey] = normalizeUpdateSource(source) }
+    }
+
     companion object {
         val DEFAULT_BACKEND_URL: String = BackendEndpoint.normalize(
             BuildConfig.DEFAULT_BACKEND_URL,
@@ -84,5 +93,15 @@ class SettingsStore(private val context: Context) {
         const val EMBEDDED_ENGINE_LLAMA_CPP = "llamacpp"
         const val DEFAULT_OLLAMA_URL = "http://localhost:11434"
         const val DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
+        const val UPDATE_SOURCE_AUTO = "auto"
+        const val UPDATE_SOURCE_FORGEJO = "forgejo"
+        const val UPDATE_SOURCE_GITHUB = "github"
+
+        fun normalizeUpdateSource(source: String?): String =
+            when (source?.trim()?.lowercase()) {
+                UPDATE_SOURCE_FORGEJO -> UPDATE_SOURCE_FORGEJO
+                UPDATE_SOURCE_GITHUB -> UPDATE_SOURCE_GITHUB
+                else -> UPDATE_SOURCE_AUTO
+            }
     }
 }
