@@ -82,6 +82,7 @@ data class AppUiState(
     val auth: AuthState = AuthState(),
     val loading: Boolean = false,
     val error: String? = null,
+    val notice: String? = null,
     val backendUrl: String = "",
     val models: List<ModelDescriptor> = emptyList(),
     val selectedModel: String? = null,
@@ -161,7 +162,7 @@ class NullXoidViewModel(
 
     fun login(username: String, password: String) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = true, error = null)
+            _state.value = _state.value.copy(loading = true, error = null, notice = null)
             runCatching { repo.login(username, password) }
                 .onSuccess { auth ->
                     _state.value = _state.value.copy(loading = false, auth = auth)
@@ -175,7 +176,7 @@ class NullXoidViewModel(
 
     fun loginWithPasskey(context: Context) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = true, error = null)
+            _state.value = _state.value.copy(loading = true, error = null, notice = null)
             runCatching { repo.loginWithPasskey(context) }
                 .onSuccess { auth ->
                     _state.value = _state.value.copy(loading = false, auth = auth)
@@ -289,12 +290,13 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(
                 passkeyProvider = null,
                 passkeyCredentials = emptyList(),
-                passkeyLoading = false
+                passkeyLoading = false,
+                notice = null
             )
             return
         }
         viewModelScope.launch {
-            _state.value = _state.value.copy(passkeyLoading = true, error = null)
+            _state.value = _state.value.copy(passkeyLoading = true, error = null, notice = null)
             runCatching { repo.passkeyCredentials() }
                 .onSuccess { response ->
                     _state.value = _state.value.copy(
@@ -315,24 +317,32 @@ class NullXoidViewModel(
     fun registerPasskey(context: Context) {
         if (!_state.value.auth.authenticated) {
             _state.value = _state.value.copy(
-                error = "Sign in with password once before adding a passkey on this phone."
+                error = "Sign in with password once before adding a passkey on this phone.",
+                notice = null
             )
             return
         }
         viewModelScope.launch {
-            _state.value = _state.value.copy(passkeyLoading = true, error = null)
+            _state.value = _state.value.copy(passkeyLoading = true, error = null, notice = null)
             runCatching { repo.registerPasskey(context) }
                 .onSuccess { response ->
+                    val added = response.credential != null ||
+                        response.credentials.size > _state.value.passkeyCredentials.size
                     _state.value = _state.value.copy(
                         passkeyLoading = false,
                         passkeyProvider = response.provider ?: _state.value.passkeyProvider,
-                        passkeyCredentials = response.credentials
+                        passkeyCredentials = response.credentials,
+                        notice = if (added)
+                            "Passkey saved. Sign out, then use existing passkey to test this phone."
+                        else
+                            "Passkey setup returned, but no new credential was reported. Tap Refresh or try another provider."
                     )
                 }
                 .onFailure { t ->
                     _state.value = _state.value.copy(
                         passkeyLoading = false,
-                        error = mobilePasskeyRegistrationError(t)
+                        error = mobilePasskeyRegistrationError(t),
+                        notice = null
                     )
                 }
         }
@@ -340,13 +350,14 @@ class NullXoidViewModel(
 
     fun revokePasskey(credentialId: String) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(passkeyLoading = true, error = null)
+            _state.value = _state.value.copy(passkeyLoading = true, error = null, notice = null)
             runCatching { repo.revokePasskey(credentialId) }
                 .onSuccess {
                     _state.value = _state.value.copy(
                         passkeyLoading = false,
                         passkeyCredentials = _state.value.passkeyCredentials
-                            .filterNot { item -> item.credentialId == credentialId }
+                            .filterNot { item -> item.credentialId == credentialId },
+                        notice = "Passkey removed."
                     )
                     refreshPasskeys()
                 }
@@ -458,7 +469,7 @@ class NullXoidViewModel(
     }
 
     fun clearError() {
-        _state.value = _state.value.copy(error = null)
+        _state.value = _state.value.copy(error = null, notice = null)
     }
 
     fun checkForUpdate() {

@@ -240,6 +240,22 @@ fun SettingsScreen(
             ) {
                 Text(if (state.passkeyLoading) "Working" else "Add passkey")
             }
+            state.notice?.let { notice ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    notice,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            state.error?.let { error ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             Spacer(Modifier.height(8.dp))
             if (state.passkeyCredentials.isEmpty()) {
                 Text("No passkeys enrolled.", style = MaterialTheme.typography.bodySmall)
