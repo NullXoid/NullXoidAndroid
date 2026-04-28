@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -33,7 +34,9 @@ import com.nullxoid.android.ui.AppUiState
 fun LoginScreen(
     state: AppUiState,
     onLogin: (String, String) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onPasskeySetup: () -> Unit,
+    onOidcSetup: () -> Unit
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -65,7 +68,24 @@ fun LoginScreen(
                 state.backendUrl.ifEmpty { "(no backend configured)" },
                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall
             )
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
+            Button(
+                modifier = Modifier.testTag("login-passkey"),
+                onClick = onPasskeySetup,
+                enabled = !state.loading
+            ) { Text("Set up passkey sign-in") }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                modifier = Modifier.testTag("login-oidc"),
+                onClick = onOidcSetup,
+                enabled = !state.loading
+            ) { Text("Set up OIDC") }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Password fallback is for development or migration only.",
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+            )
+            Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },

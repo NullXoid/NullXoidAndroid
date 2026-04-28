@@ -65,7 +65,9 @@ fun NullXoidApp(app: NullXoidApplication) {
                     LoginScreen(
                         state = state,
                         onLogin = vm::login,
-                        onOpenSettings = { nav.navigate(Routes.Settings) }
+                        onOpenSettings = { nav.navigate(Routes.Settings) },
+                        onPasskeySetup = { nav.navigate(Routes.Settings) },
+                        onOidcSetup = { nav.navigate(Routes.Settings) }
                     )
                 }
                 composable(Routes.ChatList) {
