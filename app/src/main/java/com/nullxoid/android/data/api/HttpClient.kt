@@ -39,11 +39,11 @@ class InMemoryCookieJar : CookieJar {
 
     @Synchronized
     fun csrfToken(host: String): String? =
-        store[host]?.firstOrNull { it.name.equals("csrftoken", ignoreCase = true) }?.value
+        store[host]?.firstOrNull { it.name.equals("nx_csrf", ignoreCase = true) }?.value
 }
 
 /**
- * Attaches X-CSRFToken (from the cookie of the same name) to every
+ * Attaches X-CSRF-Token (from the nx_csrf cookie) to every
  * mutating request. Mirrors NullXoidBackendBridge::attachJsonRequestHeaders.
  */
 class CsrfInterceptor(private val cookieJar: InMemoryCookieJar) : Interceptor {
@@ -55,7 +55,7 @@ class CsrfInterceptor(private val cookieJar: InMemoryCookieJar) : Interceptor {
 
         val token = cookieJar.csrfToken(original.url.host) ?: return chain.proceed(original)
         val patched = original.newBuilder()
-            .header("X-CSRFToken", token)
+            .header("X-CSRF-Token", token)
             .header("X-Requested-With", "XMLHttpRequest")
             .build()
         return chain.proceed(patched)
