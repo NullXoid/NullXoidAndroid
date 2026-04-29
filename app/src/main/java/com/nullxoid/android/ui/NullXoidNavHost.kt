@@ -22,10 +22,12 @@ import com.nullxoid.android.ui.auth.LoginScreen
 import com.nullxoid.android.ui.chat.ChatListScreen
 import com.nullxoid.android.ui.chat.ChatScreen
 import com.nullxoid.android.ui.health.HealthScreen
+import com.nullxoid.android.ui.onboarding.OnboardingScreen
 import com.nullxoid.android.ui.settings.SettingsScreen
 import com.nullxoid.android.ui.theme.NullXoidTheme
 
 object Routes {
+    const val Onboarding = "onboarding"
     const val Login = "login"
     const val ChatList = "chats"
     const val Chat = "chat"
@@ -55,16 +57,28 @@ fun NullXoidApp(
         }
     }
 
-    LaunchedEffect(state.auth.authenticated) {
+    LaunchedEffect(state.auth.authenticated, state.onboardingCompleted) {
         val current = nav.currentBackStackEntry?.destination?.route
         if (state.auth.authenticated && current == Routes.Login) {
-            nav.navigate(Routes.ChatList) {
+            nav.navigate(if (state.onboardingCompleted) Routes.ChatList else Routes.Onboarding) {
                 popUpTo(Routes.Login) { inclusive = true }
             }
         } else if (!state.auth.authenticated &&
-            current != null && current != Routes.Login && current != Routes.Settings) {
+            current != null &&
+            current != Routes.Login &&
+            current != Routes.Settings &&
+            current != Routes.Onboarding) {
             nav.navigate(Routes.Login) {
                 popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+
+    LaunchedEffect(state.onboardingCompleted, state.auth.authenticated) {
+        val current = nav.currentBackStackEntry?.destination?.route
+        if (state.onboardingCompleted && current == Routes.Onboarding) {
+            nav.navigate(if (state.auth.authenticated) Routes.ChatList else Routes.Login) {
+                popUpTo(Routes.Onboarding) { inclusive = true }
             }
         }
     }
@@ -73,8 +87,24 @@ fun NullXoidApp(
         Surface(Modifier.fillMaxSize()) {
             NavHost(
                 navController = nav,
-                startDestination = if (state.auth.authenticated) Routes.ChatList else Routes.Login
+                startDestination = Routes.Onboarding
             ) {
+                composable(Routes.Onboarding) {
+                    OnboardingScreen(
+                        state = state,
+                        onSaveBackend = vm::setBackendUrl,
+                        onCheckBackend = vm::refreshHealth,
+                        onOpenLogin = { nav.navigate(Routes.Login) },
+                        onPasskeySignIn = { vm.loginWithPasskey(context) },
+                        onRegisterPasskey = { vm.registerPasskey(context) },
+                        onRefreshPasskeys = vm::refreshPasskeys,
+                        onSelectUpdateSource = vm::setUpdateSource,
+                        onCheckForUpdate = vm::checkForUpdate,
+                        onOpenUpdateReleasePage = vm::openUpdateReleasePage,
+                        onInstallUpdate = vm::installLatestUpdate,
+                        onFinish = vm::finishOnboarding
+                    )
+                }
                 composable(Routes.Login) {
                     LoginScreen(
                         state = state,
@@ -128,7 +158,11 @@ fun NullXoidApp(
                         onInstallUpdate = vm::installLatestUpdate,
                         onRefreshPasskeys = vm::refreshPasskeys,
                         onRegisterPasskey = { vm.registerPasskey(context) },
-                        onRevokePasskey = vm::revokePasskey
+                        onRevokePasskey = vm::revokePasskey,
+                        onRunOnboarding = {
+                            vm.resetOnboarding()
+                            nav.navigate(Routes.Onboarding)
+                        }
                     )
                 }
                 composable(Routes.Health) {
@@ -141,7 +175,9 @@ fun NullXoidApp(
             }
 
             val updateInfo = state.updateInfo
-            if (updateInfo?.updateAvailable == true && !state.updatePromptDismissed) {
+            if (updateInfo?.updateAvailable == true &&
+                !state.updatePromptDismissed &&
+                state.onboardingCompleted) {
                 AlertDialog(
                     onDismissRequest = vm::dismissUpdatePrompt,
                     title = { Text("Update available") },

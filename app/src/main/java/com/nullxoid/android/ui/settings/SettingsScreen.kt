@@ -58,7 +58,8 @@ fun SettingsScreen(
     onInstallUpdate: () -> Unit,
     onRefreshPasskeys: () -> Unit,
     onRegisterPasskey: () -> Unit,
-    onRevokePasskey: (String) -> Unit
+    onRevokePasskey: (String) -> Unit,
+    onRunOnboarding: () -> Unit
 ) {
     var urlDraft by remember(state.backendUrl) { mutableStateOf(state.backendUrl) }
     var providerUrlDraft by remember(state.ollamaUrl) { mutableStateOf(state.ollamaUrl) }
@@ -124,8 +125,8 @@ fun SettingsScreen(
                     label = { Text("Hosted API") }
                 )
                 FilterChip(
-                    selected = urlDraft.trim() == SettingsStore.DEFAULT_BACKEND_URL,
-                    onClick = { urlDraft = SettingsStore.DEFAULT_BACKEND_URL },
+                    selected = urlDraft.trim() == SettingsStore.LOCAL_BACKEND_URL,
+                    onClick = { urlDraft = SettingsStore.LOCAL_BACKEND_URL },
                     label = { Text("Local") }
                 )
                 FilterChip(
@@ -140,6 +141,11 @@ fun SettingsScreen(
                 onClick = { onSave(urlDraft.trim()) },
                 enabled = backendUrlChanged
             ) { Text("Save") }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                modifier = Modifier.testTag("settings-run-onboarding"),
+                onClick = onRunOnboarding
+            ) { Text("Run guided setup") }
 
             Spacer(Modifier.height(24.dp))
             Row(

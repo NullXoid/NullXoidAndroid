@@ -69,10 +69,10 @@ android {
         versionCode = providers.gradleProperty("APP_VERSION_CODE")
             .orElse(providers.environmentVariable("APP_VERSION_CODE"))
             .map(String::toInt)
-            .getOrElse(50)
+            .getOrElse(51)
         versionName = providers.gradleProperty("APP_VERSION_NAME")
             .orElse(providers.environmentVariable("APP_VERSION_NAME"))
-            .getOrElse("0.1.50")
+            .getOrElse("0.1.51")
     }
 
     buildFeatures {

@@ -21,6 +21,7 @@ class SettingsStore(private val context: Context) {
     private val ollamaUrlKey = stringPreferencesKey("ollama_url")
     private val ollamaModelKey = stringPreferencesKey("ollama_model")
     private val updateSourceKey = stringPreferencesKey("update_source")
+    private val onboardingCompletedKey = booleanPreferencesKey("onboarding_completed")
 
     val backendUrl: Flow<String> = context.settingsDataStore.data.map {
         it[backendUrlKey] ?: DEFAULT_BACKEND_URL
@@ -48,6 +49,10 @@ class SettingsStore(private val context: Context) {
 
     val updateSource: Flow<String> = context.settingsDataStore.data.map {
         normalizeUpdateSource(it[updateSourceKey])
+    }
+
+    val onboardingCompleted: Flow<Boolean> = context.settingsDataStore.data.map {
+        it[onboardingCompletedKey] ?: false
     }
 
     suspend fun setBackendUrl(url: String) {
@@ -78,6 +83,10 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[updateSourceKey] = normalizeUpdateSource(source) }
     }
 
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        context.settingsDataStore.edit { it[onboardingCompletedKey] = completed }
+    }
+
     companion object {
         val DEFAULT_BACKEND_URL: String = BackendEndpoint.normalize(
             BuildConfig.DEFAULT_BACKEND_URL,
@@ -87,6 +96,7 @@ class SettingsStore(private val context: Context) {
             BuildConfig.PUBLIC_BACKEND_URL,
             BackendEndpoint.PUBLIC_ECHOLABS_URL
         )
+        const val LOCAL_BACKEND_URL = BackendEndpoint.LOCAL_DEFAULT_URL
         const val EMBEDDED_BACKEND_URL = BackendEndpoint.EMBEDDED_URL
         const val EMBEDDED_ENGINE_ECHO = "echo"
         const val EMBEDDED_ENGINE_OLLAMA = "ollama"

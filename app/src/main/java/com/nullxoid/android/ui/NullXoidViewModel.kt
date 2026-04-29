@@ -104,6 +104,7 @@ data class AppUiState(
     val passkeyProvider: PasskeyProviderStatus? = null,
     val passkeyCredentials: List<PasskeyCredentialRecord> = emptyList(),
     val passkeyLoading: Boolean = false,
+    val onboardingCompleted: Boolean = false,
     val currentAppVersionName: String = BuildConfig.VERSION_NAME,
     val currentAppVersionCode: Int = BuildConfig.VERSION_CODE
 )
@@ -134,6 +135,8 @@ class NullXoidViewModel(
                 .getOrDefault(SettingsStore.DEFAULT_OLLAMA_MODEL)
             val updateSource = runCatching { settingsStore.updateSource.first() }
                 .getOrDefault(SettingsStore.UPDATE_SOURCE_AUTO)
+            val onboardingCompleted = runCatching { settingsStore.onboardingCompleted.first() }
+                .getOrDefault(false)
             if (embedded) ensureBackendRunning()
             val auth = runCatching { repo.bootstrap() }.getOrElse { AuthState() }
             _state.value = _state.value.copy(
@@ -143,6 +146,7 @@ class NullXoidViewModel(
                 ollamaUrl = ollamaUrl,
                 ollamaModel = ollamaModel,
                 updateSource = updateSource,
+                onboardingCompleted = onboardingCompleted,
                 auth = auth,
                 backendUrl = url,
                 selectedModel = repo.selectedModel()
@@ -252,7 +256,16 @@ class NullXoidViewModel(
         viewModelScope.launch {
             streamJob?.cancel()
             repo.logout()
-            _state.value = AppUiState(backendUrl = _state.value.backendUrl)
+            val current = _state.value
+            _state.value = AppUiState(
+                backendUrl = current.backendUrl,
+                embeddedEnabled = current.embeddedEnabled,
+                embeddedEngine = current.embeddedEngine,
+                ollamaUrl = current.ollamaUrl,
+                ollamaModel = current.ollamaModel,
+                updateSource = current.updateSource,
+                onboardingCompleted = current.onboardingCompleted
+            )
         }
     }
 
@@ -600,6 +613,20 @@ class NullXoidViewModel(
                 updatePromptDismissed = false
             )
             checkForUpdateSilently()
+        }
+    }
+
+    fun finishOnboarding() {
+        viewModelScope.launch {
+            settingsStore.setOnboardingCompleted(true)
+            _state.value = _state.value.copy(onboardingCompleted = true, notice = null, error = null)
+        }
+    }
+
+    fun resetOnboarding() {
+        viewModelScope.launch {
+            settingsStore.setOnboardingCompleted(false)
+            _state.value = _state.value.copy(onboardingCompleted = false)
         }
     }
 
