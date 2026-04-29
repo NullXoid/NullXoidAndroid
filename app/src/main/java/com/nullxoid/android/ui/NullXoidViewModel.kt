@@ -436,6 +436,7 @@ class NullXoidViewModel(
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
             val acc = StringBuilder()
+            var streamFailed = false
             runCatching {
                 val active = _state.value.activeChat
                 val chat = active ?: run {
@@ -462,13 +463,22 @@ class NullXoidViewModel(
                             _state.value = _state.value.copy(streamBuffer = acc.toString())
                         }
                         is StreamEvent.Error -> {
+                            streamFailed = true
                             _state.value = _state.value.copy(
                                 streaming = false,
                                 error = evt.message
                             )
                         }
                         StreamEvent.Completed -> {
+                            if (streamFailed) return@collect
                             val finalText = acc.toString()
+                            if (finalText.isBlank()) {
+                                _state.value = _state.value.copy(
+                                    streaming = false,
+                                    streamBuffer = ""
+                                )
+                                return@collect
+                            }
                             val updated = _state.value.activeMessages +
                                 ChatMessage(role = "assistant", content = finalText)
                             _state.value = _state.value.copy(

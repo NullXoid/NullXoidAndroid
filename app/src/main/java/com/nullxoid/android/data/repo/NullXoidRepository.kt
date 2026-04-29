@@ -139,7 +139,7 @@ class NullXoidRepository(
         workspaceId: String? = null,
         projectId: String? = null
     ): ChatRecord {
-        val auth = _auth.value
+        val auth = requireScopedAuth()
         val context = if (workspaceId.isNullOrBlank() || projectId.isNullOrBlank()) {
             resolveChatContext()
         } else {
@@ -169,7 +169,7 @@ class NullXoidRepository(
         workspaceId: String? = null,
         projectId: String? = null
     ): Flow<StreamEvent> = flow {
-        val auth = _auth.value
+        val auth = requireScopedAuth()
         val context = if (workspaceId.isNullOrBlank() || projectId.isNullOrBlank()) {
             resolveChatContext()
         } else {
@@ -192,6 +192,22 @@ class NullXoidRepository(
 
     suspend fun selectedModel(): String? = settingsStore.selectedModel.first()
     suspend fun setSelectedModel(modelId: String) = settingsStore.setSelectedModel(modelId)
+
+    private suspend fun requireScopedAuth(): AuthState {
+        val current = _auth.value
+        if (!current.userId.isNullOrBlank() && !current.tenantId.isNullOrBlank()) {
+            return current
+        }
+        val refreshed = api.fetchAuthState()
+        _auth.value = refreshed
+        if (refreshed.userId.isNullOrBlank()) {
+            error("Sign in again before starting a hosted chat")
+        }
+        if (refreshed.tenantId.isNullOrBlank()) {
+            return refreshed.copy(tenantId = "default").also { _auth.value = it }
+        }
+        return refreshed
+    }
 
     private suspend fun resolveChatContext(): ChatContext {
         cachedChatContext?.let { return it }
