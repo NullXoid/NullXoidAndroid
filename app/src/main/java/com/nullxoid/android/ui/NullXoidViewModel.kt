@@ -74,6 +74,11 @@ internal fun parseSavedChatRecoveryImport(json: Json, raw: String): JsonObject {
     }
 }
 
+internal fun resolveSavedChatRecoverySecret(typedSecret: String, bundle: JsonObject): String {
+    val bundledSecret = bundle["recovery_secret"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+    return bundledSecret.ifBlank { typedSecret.trim() }
+}
+
 internal fun estimateStreamTokens(text: String): Int =
     if (text.isBlank()) 0 else maxOf(1, (text.length + 3) / 4)
 
@@ -530,7 +535,7 @@ class NullXoidViewModel(
                 val bundle = parseSavedChatRecoveryImport(importJson, recoveryBundleJson)
                 val bundledSecret = bundle["recovery_secret"]?.jsonPrimitive?.contentOrNull.orEmpty()
                 importWasTwoPartBundle = bundledSecret.isBlank()
-                val resolvedSecret = recoverySecret.trim().ifBlank { bundledSecret.trim() }
+                val resolvedSecret = resolveSavedChatRecoverySecret(recoverySecret, bundle)
                 require(resolvedSecret.isNotBlank()) {
                     "This is an older two-part recovery bundle. Since you do not have the recovery secret, go to the web app, open Settings > Privacy/Security, click Copy Android import kit, then paste that full new JSON here with the recovery secret field blank. The new JSON says \"kit_type\":\"one_paste_android_import\" and includes \"recovery_secret\"."
                 }
@@ -570,7 +575,7 @@ class NullXoidViewModel(
                 if (importWasTwoPartBundle) {
                     "This is a two-part recovery bundle and the recovery secret entered here did not match it. If you do not know the exact secret, copy a fresh one-paste Android import kit from the web app. The fresh JSON says \"kit_type\":\"one_paste_android_import\" and includes \"recovery_secret\"; leave the Recovery secret field blank."
                 } else {
-                    "Saved-chat recovery did not unlock. Paste a fresh one-paste Android import kit copied from the same signed-in browser account. The JSON should say \"kit_type\":\"one_paste_android_import\" and include \"recovery_secret\"."
+                    "Saved-chat recovery did not unlock. Scan or paste a fresh Android import kit copied from the same signed-in browser account. Full paste kits say \"kit_type\":\"one_paste_android_import\" and QR kits say \"p\":\"nx.aik1\"."
                 }
             message.contains("two-part recovery bundle", ignoreCase = true) -> message
             message.isNotBlank() -> message

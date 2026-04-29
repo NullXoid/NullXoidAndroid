@@ -34,4 +34,16 @@ class SavedChatRecoveryImportParserTest {
         assertEquals("nonce-value", parsed["recovery_envelope"]!!.jsonObject["nonce"]!!.jsonPrimitive.content)
         assertEquals("cipher-value", parsed["recovery_envelope"]!!.jsonObject["ciphertext"]!!.jsonPrimitive.content)
     }
+
+    @Test
+    fun embeddedImportSecretWinsOverStaleTypedSecret() {
+        val parsed = parseSavedChatRecoveryImport(
+            Json,
+            """
+                {"v":1,"p":"nx.aik1","t":"default","u":"user-123","e":7,"r":{"s":"salt","n":"nonce","c":"cipher"},"k":"fresh-embedded-secret"}
+            """.trimIndent()
+        )
+
+        assertEquals("fresh-embedded-secret", resolveSavedChatRecoverySecret("old typed secret", parsed))
+    }
 }
