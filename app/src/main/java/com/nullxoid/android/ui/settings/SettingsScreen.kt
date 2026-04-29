@@ -1,6 +1,7 @@
 package com.nullxoid.android.ui.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -36,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -91,9 +94,18 @@ fun SettingsScreen(
     val backendUrlChanged = urlDraft.trim() != state.backendUrl.trim()
     val providerSettingsChanged = providerUrlDraft.trim() != state.ollamaUrl.trim() ||
         providerModelDraft.trim() != state.ollamaModel.trim()
+    val savedChatRecoveryImported =
+        state.notice?.contains("Saved-chat recovery key imported", ignoreCase = true) == true
 
     LaunchedEffect(state.auth.authenticated, state.backendUrl) {
         if (state.auth.authenticated) onRefreshPasskeys()
+    }
+
+    LaunchedEffect(savedChatRecoveryImported) {
+        if (savedChatRecoveryImported) {
+            recoverySecretDraft = ""
+            recoveryEnvelopeDraft = ""
+        }
     }
 
     Scaffold(
@@ -193,7 +205,7 @@ fun SettingsScreen(
             ) {
                 Text(if (state.passkeyLoading) "Working" else "Add passkey")
             }
-            state.notice?.let { notice ->
+            state.notice?.takeUnless { savedChatRecoveryImported }?.let { notice ->
                 Spacer(Modifier.height(8.dp))
                 Text(
                     notice,
@@ -243,6 +255,30 @@ fun SettingsScreen(
             Spacer(Modifier.height(16.dp))
             Text("Saved-chat recovery", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
+            if (savedChatRecoveryImported) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings-recovery-success"),
+                    color = Color(0xFF123C24),
+                    contentColor = Color(0xFFE8FFE9),
+                    border = BorderStroke(1.dp, Color(0xFF35D06F)),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text(
+                            "Saved-chat E2EE is unlocked on this phone",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Browser-created encrypted chats can now open and reply from Android.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
             Text(
                 "If you do not remember a recovery secret, use the web app: Settings > Privacy/Security > Reset browser device setup, then Copy Android import kit. Scan the QR or paste the full JSON below and leave the optional secret field blank. The fresh JSON says \"kit_type\":\"one_paste_android_import\".",
                 style = MaterialTheme.typography.bodySmall
