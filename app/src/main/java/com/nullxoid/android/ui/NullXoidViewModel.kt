@@ -24,6 +24,7 @@ import com.nullxoid.android.data.repo.NullXoidRepository
 import com.nullxoid.android.data.update.AppUpdateChecker
 import com.nullxoid.android.data.update.AppUpdateInfo
 import com.nullxoid.android.data.update.AppUpdateInstaller
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -421,6 +422,7 @@ class NullXoidViewModel(
     fun sendMessage(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
+        if (_state.value.streaming) return
         val model = _state.value.selectedModel ?: run {
             _state.value = _state.value.copy(error = "Select a model first")
             return
@@ -433,7 +435,6 @@ class NullXoidViewModel(
             streamBuffer = "",
             error = null
         )
-        streamJob?.cancel()
         streamJob = viewModelScope.launch {
             val acc = StringBuilder()
             var streamFailed = false
@@ -495,7 +496,11 @@ class NullXoidViewModel(
                     }
                 }
             }.onFailure { t ->
-                _state.value = _state.value.copy(streaming = false, error = t.message)
+                if (t is CancellationException) {
+                    _state.value = _state.value.copy(streaming = false, streamBuffer = "")
+                } else {
+                    _state.value = _state.value.copy(streaming = false, error = t.message)
+                }
             }
         }
     }
