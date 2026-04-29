@@ -157,7 +157,8 @@ data class ChatRecord(
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
     val archived: Boolean = false,
-    val session: ChatSession? = null
+    val session: ChatSession? = null,
+    val e2ee: JsonObject? = null
 )
 
 @Serializable
@@ -177,7 +178,19 @@ data class ChatCreateRequest(
     @SerialName("workspace_id") val workspaceId: String? = null,
     @SerialName("project_id") val projectId: String? = null,
     val title: String,
-    val messages: List<ChatMessage>
+    val messages: List<ChatMessage>,
+    val e2ee: JsonObject? = null
+)
+
+@Serializable
+data class ChatUpdateRequest(
+    @SerialName("tenant_id") val tenantId: String,
+    @SerialName("user_id") val userId: String,
+    @SerialName("workspace_id") val workspaceId: String? = null,
+    @SerialName("project_id") val projectId: String? = null,
+    val title: String,
+    val messages: List<ChatMessage>,
+    val e2ee: JsonObject? = null
 )
 
 @Serializable

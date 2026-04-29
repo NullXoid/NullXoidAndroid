@@ -633,7 +633,7 @@ class NullXoidViewModel(
                                 lastFailedPrompt = null,
                                 streamStatus = ""
                             )
-                            refreshChats()
+                            persistActiveChat(updated)
                         }
                         else -> Unit
                     }
@@ -687,6 +687,26 @@ class NullXoidViewModel(
             lastFailedPrompt = failedPrompt,
             error = error
         )
+    }
+
+    private suspend fun persistActiveChat(messages: List<ChatMessage>) {
+        val chat = _state.value.activeChat ?: return
+        val title = chat.title.ifBlank {
+            messages.firstOrNull { it.role == "user" }?.content?.take(60) ?: "New chat"
+        }
+        runCatching {
+            repo.updateChat(chat = chat, title = title, messages = messages)
+        }.onSuccess { saved ->
+            val local = saved.copy(session = ChatSession(messages = messages))
+            _state.value = _state.value.copy(
+                activeChat = local,
+                chats = listOf(local) + _state.value.chats.filterNot { it.id == local.id }
+            )
+        }.onFailure { t ->
+            _state.value = _state.value.copy(
+                notice = "Chat stayed local because encrypted save failed: ${t.message ?: "unknown error"}"
+            )
+        }
     }
 
     fun cancelStream() {

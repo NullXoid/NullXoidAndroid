@@ -6,11 +6,16 @@ import com.nullxoid.android.data.api.BackendEndpoint
 import com.nullxoid.android.data.api.NullXoidApi
 import com.nullxoid.android.data.auth.NativeAuthCoordinator
 import com.nullxoid.android.data.auth.OidcLaunch
+import com.nullxoid.android.data.e2ee.AndroidSavedChatKeyProvider
+import com.nullxoid.android.data.e2ee.SavedChatE2ee
+import com.nullxoid.android.data.e2ee.SavedChatKeyProvider
 import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.ChatCreateRequest
 import com.nullxoid.android.data.model.ChatMessage
 import com.nullxoid.android.data.model.ChatRecord
+import com.nullxoid.android.data.model.ChatSession
 import com.nullxoid.android.data.model.ChatStreamRequest
+import com.nullxoid.android.data.model.ChatUpdateRequest
 import com.nullxoid.android.data.model.ClientManifest
 import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.ModelDescriptor
@@ -32,7 +37,8 @@ import kotlinx.coroutines.flow.flow
  * (AiAssistant/src/app) which sits between MainWindow and the bridge.
  */
 class NullXoidRepository(
-    private val settingsStore: SettingsStore
+    private val settingsStore: SettingsStore,
+    private val savedChatKeyProvider: SavedChatKeyProvider = AndroidSavedChatKeyProvider()
 ) {
     private val api = NullXoidApi { currentBaseUrl }
     private val nativeAuth = NativeAuthCoordinator(api)
@@ -139,7 +145,7 @@ class NullXoidRepository(
             tenantId = auth.tenantId.orEmpty(),
             userId = auth.userId.orEmpty(),
             workspaceId = context.workspaceId
-        ).chats
+        ).chats.map { decryptChatRecord(auth, it) }
     }
 
     suspend fun createChat(
@@ -161,7 +167,43 @@ class NullXoidRepository(
                 workspaceId = context.workspaceId,
                 projectId = context.projectId,
                 title = title,
-                messages = messages
+                messages = emptyList(),
+                e2ee = savedChatEnvelopeOrNull(
+                    auth.tenantId.orEmpty(),
+                    auth.userId.orEmpty(),
+                    title,
+                    messages
+                )
+            )
+        )
+    }
+
+    suspend fun updateChat(
+        chat: ChatRecord,
+        title: String,
+        messages: List<ChatMessage>
+    ): ChatRecord {
+        val auth = requireScopedAuth()
+        val context = if (chat.workspaceId.isNullOrBlank() || chat.projectId.isNullOrBlank()) {
+            resolveChatContext()
+        } else {
+            ChatContext(chat.workspaceId, chat.projectId)
+        }
+        return api.updateChat(
+            chat.id,
+            ChatUpdateRequest(
+                tenantId = auth.tenantId.orEmpty(),
+                userId = auth.userId.orEmpty(),
+                workspaceId = context.workspaceId,
+                projectId = context.projectId,
+                title = title,
+                messages = emptyList(),
+                e2ee = savedChatEnvelopeOrNull(
+                    auth.tenantId.orEmpty(),
+                    auth.userId.orEmpty(),
+                    title,
+                    messages
+                )
             )
         )
     }
@@ -214,6 +256,39 @@ class NullXoidRepository(
         } else {
             null
         }
+    }
+
+    private fun savedChatEnvelopeOrNull(
+        tenantId: String,
+        userId: String,
+        title: String,
+        messages: List<ChatMessage>
+    ) = if (messages.isEmpty()) {
+        null
+    } else {
+        SavedChatE2ee.envelope(
+            tenantId = tenantId,
+            userId = userId,
+            title = title,
+            messages = messages,
+            keyProvider = savedChatKeyProvider
+        )
+    }
+
+    private fun decryptChatRecord(auth: AuthState, chat: ChatRecord): ChatRecord {
+        if (!chat.session?.messages.isNullOrEmpty()) return chat
+        val payload = runCatching {
+            SavedChatE2ee.decryptPayload(
+                tenantId = auth.tenantId.orEmpty(),
+                userId = auth.userId.orEmpty(),
+                e2ee = chat.e2ee,
+                keyProvider = savedChatKeyProvider
+            )
+        }.getOrNull() ?: return chat
+        return chat.copy(
+            title = chat.title.ifBlank { payload.title },
+            session = ChatSession(messages = payload.messages)
+        )
     }
 
     suspend fun selectedModel(): String? = settingsStore.selectedModel.first()

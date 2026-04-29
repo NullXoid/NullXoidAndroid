@@ -5,6 +5,7 @@ import com.nullxoid.android.data.model.ChatCreateRequest
 import com.nullxoid.android.data.model.ChatCreateResponse
 import com.nullxoid.android.data.model.ChatListResponse
 import com.nullxoid.android.data.model.ChatRecord
+import com.nullxoid.android.data.model.ChatUpdateRequest
 import com.nullxoid.android.data.model.ClientManifest
 import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.LoginRequest
@@ -182,6 +183,22 @@ class NullXoidApi(
             val request = Request.Builder()
                 .url(url("/api/chats"))
                 .post(payloadStr.toRequestBody(jsonMedia))
+                .build()
+            HttpClient.okHttp.newCall(request).execute().use { resp ->
+                val raw = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw ApiException(resp.code, raw)
+                runCatching { json.decodeFromString(ChatCreateResponse.serializer(), raw).chat }
+                    .getOrElse { json.decodeFromString(ChatRecord.serializer(), raw) }
+            }
+        }
+    }
+
+    suspend fun updateChat(chatId: String, req: ChatUpdateRequest): ChatRecord {
+        val payloadStr = json.encodeToString(ChatUpdateRequest.serializer(), req)
+        return withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url(url("/api/chats/${urlEncode(chatId)}"))
+                .put(payloadStr.toRequestBody(jsonMedia))
                 .build()
             HttpClient.okHttp.newCall(request).execute().use { resp ->
                 val raw = resp.body?.string().orEmpty()
