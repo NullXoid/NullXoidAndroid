@@ -99,6 +99,7 @@ data class AppUiState(
     val streamApproxTokens: Int = 0,
     val streamTokensPerSecond: Double = 0.0,
     val streamStatus: String = "",
+    val lastFailedPrompt: String? = null,
     val health: HealthFeatures? = null,
     val embeddedEnabled: Boolean = false,
     val embeddedEngine: String = SettingsStore.EMBEDDED_ENGINE_ECHO,
@@ -452,7 +453,14 @@ class NullXoidViewModel(
         )
     }
 
-    fun sendMessage(text: String) {
+    fun sendMessage(text: String) = sendMessageInternal(text)
+
+    fun retryLastMessage() {
+        val prompt = _state.value.lastFailedPrompt?.takeIf { it.isNotBlank() } ?: return
+        sendMessageInternal(prompt)
+    }
+
+    private fun sendMessageInternal(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
         if (_state.value.streaming) return
@@ -472,6 +480,7 @@ class NullXoidViewModel(
             streamApproxTokens = 0,
             streamTokensPerSecond = 0.0,
             streamStatus = "Thinking",
+            lastFailedPrompt = null,
             error = null
         )
         streamJob = viewModelScope.launch {
@@ -522,6 +531,7 @@ class NullXoidViewModel(
                                 previousHistory = previousHistory,
                                 previousChat = previousChat,
                                 createdChatId = createdChatId,
+                                failedPrompt = trimmed,
                                 error = evt.message
                             )
                         }
@@ -533,6 +543,7 @@ class NullXoidViewModel(
                                     previousHistory = previousHistory,
                                     previousChat = previousChat,
                                     createdChatId = createdChatId,
+                                    failedPrompt = trimmed,
                                     error = "No assistant response was received from the backend."
                                 )
                                 return@collect
@@ -547,6 +558,9 @@ class NullXoidViewModel(
                                 ),
                                 streamBuffer = "",
                                 streamStartedAtMs = 0L,
+                                streamApproxTokens = 0,
+                                streamTokensPerSecond = 0.0,
+                                lastFailedPrompt = null,
                                 streamStatus = ""
                             )
                             refreshChats()
@@ -556,12 +570,20 @@ class NullXoidViewModel(
                 }
             }.onFailure { t ->
                 if (t is CancellationException) {
-                    _state.value = _state.value.copy(streaming = false, streamBuffer = "")
+                    _state.value = _state.value.copy(
+                        streaming = false,
+                        streamBuffer = "",
+                        streamStartedAtMs = 0L,
+                        streamApproxTokens = 0,
+                        streamTokensPerSecond = 0.0,
+                        streamStatus = ""
+                    )
                 } else {
                     restoreFailedSend(
                         previousHistory = previousHistory,
                         previousChat = previousChat,
                         createdChatId = createdChatId,
+                        failedPrompt = trimmed,
                         error = t.message ?: "Message failed"
                     )
                 }
@@ -573,6 +595,7 @@ class NullXoidViewModel(
         previousHistory: List<ChatMessage>,
         previousChat: ChatRecord?,
         createdChatId: String?,
+        failedPrompt: String?,
         error: String
     ) {
         _state.value = _state.value.copy(
@@ -589,6 +612,7 @@ class NullXoidViewModel(
             streamApproxTokens = 0,
             streamTokensPerSecond = 0.0,
             streamStatus = "",
+            lastFailedPrompt = failedPrompt,
             error = error
         )
     }
@@ -598,6 +622,9 @@ class NullXoidViewModel(
         _state.value = _state.value.copy(
             streaming = false,
             streamStartedAtMs = 0L,
+            streamBuffer = "",
+            streamApproxTokens = 0,
+            streamTokensPerSecond = 0.0,
             streamStatus = ""
         )
     }

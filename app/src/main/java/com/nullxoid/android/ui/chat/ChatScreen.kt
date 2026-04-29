@@ -1,7 +1,6 @@
 package com.nullxoid.android.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -51,6 +50,7 @@ fun ChatScreen(
     onBack: () -> Unit,
     onSend: (String) -> Unit,
     onCancel: () -> Unit,
+    onRetry: () -> Unit,
     onRefresh: () -> Unit,
     onRefreshModels: () -> Unit,
     onOpenSettings: () -> Unit
@@ -70,9 +70,15 @@ fun ChatScreen(
         }
     }
 
-    LaunchedEffect(renderedList.size, state.streamBuffer) {
+    LaunchedEffect(renderedList.size) {
         if (renderedList.isNotEmpty()) {
             listState.animateScrollToItem(renderedList.lastIndex)
+        }
+    }
+
+    LaunchedEffect(state.streaming, state.streamBuffer.length) {
+        if (state.streaming && renderedList.isNotEmpty()) {
+            listState.scrollToItem(renderedList.lastIndex)
         }
     }
 
@@ -108,6 +114,14 @@ fun ChatScreen(
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
+                        if (state.lastFailedPrompt != null && !state.streaming) {
+                            Spacer(Modifier.height(6.dp))
+                            AssistChip(
+                                modifier = Modifier.testTag("chat-retry-last-message"),
+                                onClick = onRetry,
+                                label = { Text("Retry last message") }
+                            )
+                        }
                         Spacer(Modifier.height(6.dp))
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -179,7 +193,12 @@ fun ChatScreen(
             } else {
                 LazyColumn(
                     state = listState,
-                    contentPadding = PaddingValues(12.dp),
+                    contentPadding = PaddingValues(
+                        start = 12.dp,
+                        top = 12.dp,
+                        end = 12.dp,
+                        bottom = 24.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
