@@ -337,6 +337,58 @@ class SavedChatE2eeTest {
     }
 
     @Test
+    fun onePasteAndroidImportKitRestoresAccountEpochKeyWithBlankSecretField() {
+        val tenantId = "default"
+        val userId = "shared-user"
+        val recoverySecret = "fresh one paste secret"
+        val accountKey = ByteArray(32) { (it + 11).toByte() }
+        val salt = ByteArray(16) { (it + 23).toByte() }
+        val recoveryKey = deriveRecoveryKey(recoverySecret, salt)
+        val encrypted = encryptAesGcm(
+            key = recoveryKey,
+            nonce = ByteArray(12) { (it + 37).toByte() },
+            aad = SavedChatE2ee.recoveryAad(tenantId, userId),
+            plaintext = accountKey
+        )
+        val recoveryEnvelope = buildJsonObject {
+            put("version", 1)
+            put("algorithm", "AES-GCM-256")
+            put("kdf", "PBKDF2-SHA256")
+            put("iterations", 210_000)
+            put("plaintext_storage", "forbidden")
+            put("salt", salt.base64Url())
+            put("nonce", encrypted.nonce.base64Url())
+            put("ciphertext", encrypted.ciphertext.base64Url())
+        }
+        val androidImportKit = buildJsonObject {
+            put("version", 1)
+            put("purpose", "nullxoid.android.saved_chat_recovery_bundle.v1")
+            put("kit_type", "one_paste_android_import")
+            put("requires_separate_recovery_secret", false)
+            put("tenant_id", tenantId)
+            put("user_id", userId)
+            put("epoch", 1)
+            put("recovery_envelope", recoveryEnvelope)
+            put("recovery_secret", recoverySecret)
+            put("plaintext_storage", "forbidden")
+        }
+        val resolvedSecret = "".ifBlank {
+            androidImportKit["recovery_secret"]!!.jsonPrimitive.content
+        }
+
+        val recovered = SavedChatE2ee.recoverAccountKeyFromRecoveryEnvelope(
+            tenantId = tenantId,
+            userId = userId,
+            recoverySecret = resolvedSecret,
+            recoveryEnvelope = androidImportKit["recovery_envelope"]!!.jsonObject
+        )
+
+        assertEquals("one_paste_android_import", androidImportKit["kit_type"]!!.jsonPrimitive.content)
+        assertEquals("false", androidImportKit["requires_separate_recovery_secret"]!!.jsonPrimitive.content)
+        assertArrayEquals(accountKey, recovered)
+    }
+
+    @Test
     fun recoveryEnvelopeWrongSecretUsesHumanError() {
         val tenantId = "default"
         val userId = "shared-user"
