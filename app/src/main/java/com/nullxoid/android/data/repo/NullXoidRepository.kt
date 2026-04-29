@@ -15,13 +15,16 @@ import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.OidcCompleteRequest
 import com.nullxoid.android.data.model.PasskeyCredentialsResponse
+import com.nullxoid.android.data.model.ProjectCreateRequest
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 
 /**
  * Single place the UI goes through. Same role as the desktop Controller
@@ -38,6 +41,9 @@ class NullXoidRepository(
     private var cachedBaseUrl: String = SettingsStore.DEFAULT_BACKEND_URL
     private val currentBaseUrl: String get() = cachedBaseUrl
 
+    @Volatile
+    private var cachedChatContext: ChatContext? = null
+
     private val _auth = MutableStateFlow(AuthState())
     val auth: StateFlow<AuthState> = _auth.asStateFlow()
 
@@ -51,6 +57,7 @@ class NullXoidRepository(
         val normalized = BackendEndpoint.normalize(url)
         settingsStore.setBackendUrl(normalized)
         cachedBaseUrl = normalized
+        cachedChatContext = null
     }
 
     suspend fun bootstrap(): AuthState {
@@ -64,6 +71,7 @@ class NullXoidRepository(
         refreshBaseUrl()
         val state = api.login(username, password)
         _auth.value = state
+        cachedChatContext = null
         return state
     }
 
@@ -71,6 +79,7 @@ class NullXoidRepository(
         refreshBaseUrl()
         val state = nativeAuth.signInWithPasskey(context)
         _auth.value = state
+        cachedChatContext = null
         return state
     }
 
@@ -110,12 +119,14 @@ class NullXoidRepository(
             )
         )
         _auth.value = authState
+        cachedChatContext = null
         return authState
     }
 
     suspend fun logout() {
         runCatching { api.logout() }
         _auth.value = AuthState()
+        cachedChatContext = null
     }
 
     suspend fun models(): List<ModelDescriptor> = api.models().models
@@ -129,12 +140,17 @@ class NullXoidRepository(
         projectId: String? = null
     ): ChatRecord {
         val auth = _auth.value
+        val context = if (workspaceId.isNullOrBlank() || projectId.isNullOrBlank()) {
+            resolveChatContext()
+        } else {
+            ChatContext(workspaceId, projectId)
+        }
         return api.createChat(
             ChatCreateRequest(
                 tenantId = auth.tenantId.orEmpty(),
                 userId = auth.userId.orEmpty(),
-                workspaceId = workspaceId,
-                projectId = projectId,
+                workspaceId = context.workspaceId,
+                projectId = context.projectId,
                 title = title,
                 messages = messages
             )
@@ -149,20 +165,58 @@ class NullXoidRepository(
     fun streamReply(
         model: String,
         messages: List<ChatMessage>,
-        chatId: String? = null
-    ): Flow<StreamEvent> {
+        chatId: String? = null,
+        workspaceId: String? = null,
+        projectId: String? = null
+    ): Flow<StreamEvent> = flow {
         val auth = _auth.value
-        return chatStream.stream(
-            ChatStreamRequest(
-                model = model,
-                messages = messages,
-                chatId = chatId,
-                tenantId = auth.tenantId,
-                userId = auth.userId
+        val context = if (workspaceId.isNullOrBlank() || projectId.isNullOrBlank()) {
+            resolveChatContext()
+        } else {
+            ChatContext(workspaceId, projectId)
+        }
+        emitAll(
+            chatStream.stream(
+                ChatStreamRequest(
+                    model = model,
+                    messages = messages,
+                    chatId = chatId,
+                    workspaceId = context.workspaceId,
+                    projectId = context.projectId,
+                    tenantId = auth.tenantId,
+                    userId = auth.userId
+                )
             )
         )
     }
 
     suspend fun selectedModel(): String? = settingsStore.selectedModel.first()
     suspend fun setSelectedModel(modelId: String) = settingsStore.setSelectedModel(modelId)
+
+    private suspend fun resolveChatContext(): ChatContext {
+        cachedChatContext?.let { return it }
+        val workspaces = api.workspaces()
+        val workspaceId = (
+            workspaces.workspaces.firstOrNull { it.workspaceId == workspaces.activeWorkspaceId }
+                ?: workspaces.workspaces.firstOrNull { it.slug == "lobby" }
+                ?: workspaces.workspaces.firstOrNull()
+            )?.workspaceId?.takeIf { it.isNotBlank() }
+            ?: error("No workspace available for chat")
+
+        val projects = api.projects(workspaceId).projects
+        val project = projects.firstOrNull { it.slug == "general" }
+            ?: projects.firstOrNull()
+            ?: api.createProject(ProjectCreateRequest(name = "General", workspaceId = workspaceId))
+        val projectId = project.resolvedProjectId.takeIf { it.isNotBlank() }
+            ?: error("No project available for chat")
+
+        return ChatContext(workspaceId = workspaceId, projectId = projectId).also {
+            cachedChatContext = it
+        }
+    }
+
+    data class ChatContext(
+        val workspaceId: String,
+        val projectId: String
+    )
 }

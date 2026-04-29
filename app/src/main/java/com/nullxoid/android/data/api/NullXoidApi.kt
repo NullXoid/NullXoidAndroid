@@ -2,6 +2,7 @@ package com.nullxoid.android.data.api
 
 import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.ChatCreateRequest
+import com.nullxoid.android.data.model.ChatCreateResponse
 import com.nullxoid.android.data.model.ChatListResponse
 import com.nullxoid.android.data.model.ChatRecord
 import com.nullxoid.android.data.model.HealthFeatures
@@ -13,7 +14,14 @@ import com.nullxoid.android.data.model.OidcStartResponse
 import com.nullxoid.android.data.model.PasskeyCompleteRequest
 import com.nullxoid.android.data.model.PasskeyCredentialsResponse
 import com.nullxoid.android.data.model.PasskeyOptionsResponse
+import com.nullxoid.android.data.model.ProjectCreateRequest
+import com.nullxoid.android.data.model.ProjectCreateResponse
+import com.nullxoid.android.data.model.ProjectListResponse
+import com.nullxoid.android.data.model.ProjectSummary
 import com.nullxoid.android.data.model.RemoteSettings
+import com.nullxoid.android.data.model.WorkspaceListResponse
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -131,12 +139,37 @@ class NullXoidApi(
 
     suspend fun models(): ModelListResponse = getJson("/models")
 
+    // ---- Workspaces / Projects -----------------------------------------
+
+    suspend fun workspaces(): WorkspaceListResponse = getJson("/api/workspaces")
+
+    suspend fun projects(workspaceId: String): ProjectListResponse {
+        val encoded = URLEncoder.encode(workspaceId, StandardCharsets.UTF_8.name())
+        return getJson("/api/projects?workspace_id=$encoded")
+    }
+
+    suspend fun createProject(req: ProjectCreateRequest): ProjectSummary =
+        sendJson<ProjectCreateRequest, ProjectCreateResponse>("POST", "/api/projects", req).project
+
     // ---- Chats ----------------------------------------------------------
 
     suspend fun chats(): ChatListResponse = getJson("/api/chats")
 
-    suspend fun createChat(req: ChatCreateRequest): ChatRecord =
-        sendJson("POST", "/api/chats", req)
+    suspend fun createChat(req: ChatCreateRequest): ChatRecord {
+        val payloadStr = json.encodeToString(ChatCreateRequest.serializer(), req)
+        return withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url(url("/api/chats"))
+                .post(payloadStr.toRequestBody(jsonMedia))
+                .build()
+            HttpClient.okHttp.newCall(request).execute().use { resp ->
+                val raw = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw ApiException(resp.code, raw)
+                runCatching { json.decodeFromString(ChatCreateResponse.serializer(), raw).chat }
+                    .getOrElse { json.decodeFromString(ChatRecord.serializer(), raw) }
+            }
+        }
+    }
 
     suspend fun archiveChat(chatId: String, archived: Boolean) {
         sendNoBody("POST", "/api/chats/$chatId/archive?archived=$archived")

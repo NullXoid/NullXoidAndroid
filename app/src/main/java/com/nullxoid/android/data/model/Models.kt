@@ -166,6 +166,11 @@ data class ChatListResponse(
 )
 
 @Serializable
+data class ChatCreateResponse(
+    val chat: ChatRecord
+)
+
+@Serializable
 data class ChatCreateRequest(
     @SerialName("tenant_id") val tenantId: String,
     @SerialName("user_id") val userId: String,
@@ -173,6 +178,49 @@ data class ChatCreateRequest(
     @SerialName("project_id") val projectId: String? = null,
     val title: String,
     val messages: List<ChatMessage>
+)
+
+@Serializable
+data class WorkspaceSummary(
+    @SerialName("workspace_id") val workspaceId: String,
+    val name: String = "",
+    val description: String? = null,
+    val slug: String? = null,
+    @SerialName("is_system") val isSystem: Boolean = false
+)
+
+@Serializable
+data class WorkspaceListResponse(
+    val workspaces: List<WorkspaceSummary> = emptyList(),
+    @SerialName("active_workspace_id") val activeWorkspaceId: String? = null
+)
+
+@Serializable
+data class ProjectSummary(
+    val id: String? = null,
+    @SerialName("project_id") val projectId: String? = null,
+    @SerialName("workspace_id") val workspaceId: String,
+    val name: String = "",
+    val slug: String? = null,
+    @SerialName("is_system") val isSystem: Boolean = false
+) {
+    val resolvedProjectId: String get() = projectId ?: id.orEmpty()
+}
+
+@Serializable
+data class ProjectListResponse(
+    val projects: List<ProjectSummary> = emptyList()
+)
+
+@Serializable
+data class ProjectCreateRequest(
+    val name: String,
+    @SerialName("workspace_id") val workspaceId: String
+)
+
+@Serializable
+data class ProjectCreateResponse(
+    val project: ProjectSummary
 )
 
 @Serializable

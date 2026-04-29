@@ -437,7 +437,8 @@ class NullXoidViewModel(
         streamJob = viewModelScope.launch {
             val acc = StringBuilder()
             runCatching {
-                val chatId = _state.value.activeChat?.id ?: run {
+                val active = _state.value.activeChat
+                val chat = active ?: run {
                     val created = repo.createChat(
                         title = trimmed.take(60),
                         messages = nextHistory
@@ -446,12 +447,14 @@ class NullXoidViewModel(
                         activeChat = created,
                         chats = listOf(created) + _state.value.chats.filterNot { it.id == created.id }
                     )
-                    created.id
+                    created
                 }
                 repo.streamReply(
                     model = model,
                     messages = nextHistory,
-                    chatId = chatId
+                    chatId = chat.id,
+                    workspaceId = chat.workspaceId,
+                    projectId = chat.projectId
                 ).collect { evt ->
                     when (evt) {
                         is StreamEvent.Delta -> {
