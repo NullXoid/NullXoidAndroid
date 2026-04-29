@@ -250,6 +250,7 @@ data class ChatStreamRequest(
     @SerialName("project_id") val projectId: String? = null,
     @SerialName("tenant_id") val tenantId: String? = null,
     @SerialName("user_id") val userId: String? = null,
+    @SerialName("stream_live") val streamLive: Boolean = true,
     val stream: Boolean = true,
     val parameters: JsonObject? = null
 )
