@@ -2,8 +2,14 @@ package com.nullxoid.android.data.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonTransformingSerializer
+import kotlinx.serialization.json.booleanOrNull
 
 /**
  * DTOs mirrored from the NullXoid desktop bridge
@@ -102,8 +108,26 @@ data class ModelDescriptor(
     val provider: String? = null,
     val family: String? = null,
     @SerialName("context_window") val contextWindow: Int? = null,
+    @Serializable(with = ModelCapabilitiesSerializer::class)
     val capabilities: List<String> = emptyList()
 )
+
+object ModelCapabilitiesSerializer :
+    JsonTransformingSerializer<List<String>>(ListSerializer(String.serializer())) {
+    override fun transformDeserialize(element: JsonElement): JsonElement =
+        when (element) {
+            is JsonArray -> element
+            is JsonObject -> JsonArray(
+                element.entries
+                    .filter { (_, value) ->
+                        (value as? JsonPrimitive)?.booleanOrNull ?: true
+                    }
+                    .map { (key, _) -> JsonPrimitive(key) }
+            )
+            is JsonPrimitive -> JsonArray(listOf(element))
+            else -> JsonArray(emptyList())
+        }
+}
 
 @Serializable
 data class ModelListResponse(
