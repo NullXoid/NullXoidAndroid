@@ -507,14 +507,28 @@ class NullXoidViewModel(
                         notice = "Saved-chat recovery key imported for epoch $epoch.",
                         error = null
                     )
-                }
+            }
                 .onFailure { t ->
                     _state.value = _state.value.copy(
                         passkeyLoading = false,
-                        error = t.message ?: "Saved-chat recovery import failed.",
+                        error = savedChatRecoveryImportError(t),
                         notice = null
                     )
                 }
+        }
+    }
+
+    private fun savedChatRecoveryImportError(t: Throwable): String {
+        val message = t.message.orEmpty()
+        return when {
+            message.contains("unexpected JSON", ignoreCase = true) ||
+                message.contains("Expected", ignoreCase = true) ->
+                "Recovery bundle JSON is not valid. Paste the full Android bundle copied from web Settings > Privacy/Security > Copy Android bundle."
+            message.contains("BAD_DECRYPT", ignoreCase = true) ||
+                message.contains("did not unlock", ignoreCase = true) ->
+                "Saved-chat recovery did not unlock. Check that the recovery secret is the original browser recovery secret, not the Android bundle JSON, and that the bundle was copied from this same signed-in account."
+            message.isNotBlank() -> message
+            else -> "Saved-chat recovery import failed."
         }
     }
 

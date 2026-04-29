@@ -336,6 +336,44 @@ class SavedChatE2eeTest {
         assertArrayEquals(accountKey, recovered)
     }
 
+    @Test
+    fun recoveryEnvelopeWrongSecretUsesHumanError() {
+        val tenantId = "default"
+        val userId = "shared-user"
+        val recoverySecret = "correct horse battery staple"
+        val accountKey = ByteArray(32) { (it + 5).toByte() }
+        val salt = ByteArray(16) { (it + 17).toByte() }
+        val recoveryKey = deriveRecoveryKey(recoverySecret, salt)
+        val encrypted = encryptAesGcm(
+            key = recoveryKey,
+            nonce = ByteArray(12) { (it + 29).toByte() },
+            aad = SavedChatE2ee.recoveryAad(tenantId, userId),
+            plaintext = accountKey
+        )
+        val recoveryEnvelope = buildJsonObject {
+            put("version", 1)
+            put("algorithm", "AES-GCM-256")
+            put("kdf", "PBKDF2-SHA256")
+            put("iterations", 210_000)
+            put("plaintext_storage", "forbidden")
+            put("salt", salt.base64Url())
+            put("nonce", encrypted.nonce.base64Url())
+            put("ciphertext", encrypted.ciphertext.base64Url())
+        }
+
+        try {
+            SavedChatE2ee.recoverAccountKeyFromRecoveryEnvelope(
+                tenantId = tenantId,
+                userId = userId,
+                recoverySecret = "wrong secret",
+                recoveryEnvelope = recoveryEnvelope
+            )
+            throw AssertionError("Expected wrong recovery secret to fail")
+        } catch (err: IllegalArgumentException) {
+            assertTrue(err.message.orEmpty().contains("did not unlock"))
+        }
+    }
+
     private class FakeKeyProvider : SavedChatKeyProvider {
         override fun keyId(tenantId: String, userId: String): String = "test-key"
 

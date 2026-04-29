@@ -8,6 +8,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 import javax.crypto.Cipher
+import javax.crypto.AEADBadTagException
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKeyFactory
 import javax.crypto.SecretKey
@@ -300,12 +301,19 @@ object SavedChatE2ee {
         val recoveryKey = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
             .generateSecret(PBEKeySpec(recoverySecret.toCharArray(), salt, RECOVERY_ITERATIONS, 256))
             .encoded
-        val accountKey = decryptAesGcm(
-            keyBytes = recoveryKey,
-            nonce = nonce,
-            ciphertext = ciphertext,
-            aad = recoveryAad(tenantId, userId).toByteArray(Charsets.UTF_8)
-        )
+        val accountKey = try {
+            decryptAesGcm(
+                keyBytes = recoveryKey,
+                nonce = nonce,
+                ciphertext = ciphertext,
+                aad = recoveryAad(tenantId, userId).toByteArray(Charsets.UTF_8)
+            )
+        } catch (err: AEADBadTagException) {
+            throw IllegalArgumentException(
+                "Saved-chat recovery did not unlock. Use the exact recovery secret from the browser device setup and the matching Android bundle for this signed-in account.",
+                err
+            )
+        }
         require(accountKey.size == ACCOUNT_KEY_BYTES) {
             "Recovered account key had ${accountKey.size} bytes; expected $ACCOUNT_KEY_BYTES."
         }

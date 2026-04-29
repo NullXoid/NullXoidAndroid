@@ -232,14 +232,14 @@ fun SettingsScreen(
             Text("Saved-chat recovery", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Import the web recovery secret and envelope to unlock shared encrypted chats on this phone.",
+                "Use two separate values from the same signed-in browser account: the recovery secret from device setup, plus the copied Android bundle JSON.",
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = recoverySecretDraft,
                 onValueChange = { recoverySecretDraft = it },
-                label = { Text("Recovery secret") },
+                label = { Text("Recovery secret from browser") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
@@ -250,7 +250,7 @@ fun SettingsScreen(
             OutlinedTextField(
                 value = recoveryEnvelopeDraft,
                 onValueChange = { recoveryEnvelopeDraft = it },
-                label = { Text("Recovery envelope JSON") },
+                label = { Text("Android bundle JSON") },
                 minLines = 3,
                 maxLines = 5,
                 modifier = Modifier

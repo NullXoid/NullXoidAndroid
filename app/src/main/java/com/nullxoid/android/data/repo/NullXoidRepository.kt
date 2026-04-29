@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -227,22 +228,32 @@ class NullXoidRepository(
         val keyStore = savedChatAccountKeyProvider as? SavedChatAccountKeyStore
             ?: error("Native saved-chat key storage is unavailable.")
         val envelope = recoveryBundle["recovery_envelope"]?.jsonObject ?: recoveryBundle
+        val bundleTenantId = recoveryBundle["tenant_id"]?.jsonPrimitive?.contentOrNull
+        val bundleUserId = recoveryBundle["user_id"]?.jsonPrimitive?.contentOrNull
+        val authTenantId = auth.tenantId.orEmpty()
+        val authUserId = auth.userId.orEmpty()
+        require(bundleTenantId.isNullOrBlank() || bundleTenantId == authTenantId) {
+            "This Android bundle is for tenant '$bundleTenantId', but this phone is signed in to tenant '$authTenantId'. Copy a fresh Android bundle from the same browser account."
+        }
+        require(bundleUserId.isNullOrBlank() || bundleUserId == authUserId) {
+            "This Android bundle is for a different signed-in user. Copy a fresh Android bundle from the browser while signed in as this same account."
+        }
         val epoch = recoveryBundle["epoch"]?.jsonPrimitive?.intOrNull
             ?: envelope["epoch"]?.jsonPrimitive?.intOrNull
             ?: 1
         val accountKey = SavedChatE2ee.recoverAccountKeyFromRecoveryEnvelope(
-            tenantId = auth.tenantId.orEmpty(),
-            userId = auth.userId.orEmpty(),
+            tenantId = authTenantId,
+            userId = authUserId,
             recoverySecret = recoverySecret,
             recoveryEnvelope = envelope
         )
         keyStore.storeAccountKey(
-            tenantId = auth.tenantId.orEmpty(),
-            userId = auth.userId.orEmpty(),
+            tenantId = authTenantId,
+            userId = authUserId,
             epoch = epoch,
             accountKey = accountKey
         )
-        check(keyStore.hasAccountKey(auth.tenantId.orEmpty(), auth.userId.orEmpty(), epoch)) {
+        check(keyStore.hasAccountKey(authTenantId, authUserId, epoch)) {
             "Recovered key could not be verified after local storage."
         }
         return epoch
