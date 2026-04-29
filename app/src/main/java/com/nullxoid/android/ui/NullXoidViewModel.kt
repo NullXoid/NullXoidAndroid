@@ -39,6 +39,15 @@ private const val OIDC_REDIRECT_URI = "nullxoid://auth/oidc/callback"
 internal fun estimateStreamTokens(text: String): Int =
     if (text.isBlank()) 0 else maxOf(1, (text.length + 3) / 4)
 
+internal fun formatStreamMetric(
+    status: String,
+    tokens: Int,
+    tokensPerSecond: Double
+): String {
+    val speed = String.format(java.util.Locale.US, "%.1f", tokensPerSecond)
+    return "$status | tokens ~$tokens | $speed tok/s"
+}
+
 internal fun mobilePasskeySignInError(t: Throwable): String {
     val details = listOfNotNull(t.message, t::class.simpleName).joinToString(" ").lowercase()
     return when {
@@ -99,6 +108,7 @@ data class AppUiState(
     val streamApproxTokens: Int = 0,
     val streamTokensPerSecond: Double = 0.0,
     val streamStatus: String = "",
+    val lastStreamMetric: String = "",
     val lastFailedPrompt: String? = null,
     val health: HealthFeatures? = null,
     val embeddedEnabled: Boolean = false,
@@ -480,6 +490,7 @@ class NullXoidViewModel(
             streamApproxTokens = 0,
             streamTokensPerSecond = 0.0,
             streamStatus = "Thinking",
+            lastStreamMetric = "",
             lastFailedPrompt = null,
             error = null
         )
@@ -550,6 +561,11 @@ class NullXoidViewModel(
                             }
                             val updated = _state.value.activeMessages +
                                 ChatMessage(role = "assistant", content = finalText)
+                            val finalMetric = formatStreamMetric(
+                                status = "Done",
+                                tokens = _state.value.streamApproxTokens,
+                                tokensPerSecond = _state.value.streamTokensPerSecond
+                            )
                             _state.value = _state.value.copy(
                                 streaming = false,
                                 activeMessages = updated,
@@ -560,6 +576,7 @@ class NullXoidViewModel(
                                 streamStartedAtMs = 0L,
                                 streamApproxTokens = 0,
                                 streamTokensPerSecond = 0.0,
+                                lastStreamMetric = finalMetric,
                                 lastFailedPrompt = null,
                                 streamStatus = ""
                             )
@@ -576,6 +593,7 @@ class NullXoidViewModel(
                         streamStartedAtMs = 0L,
                         streamApproxTokens = 0,
                         streamTokensPerSecond = 0.0,
+                        lastStreamMetric = "",
                         streamStatus = ""
                     )
                 } else {
@@ -612,6 +630,7 @@ class NullXoidViewModel(
             streamApproxTokens = 0,
             streamTokensPerSecond = 0.0,
             streamStatus = "",
+            lastStreamMetric = "",
             lastFailedPrompt = failedPrompt,
             error = error
         )
@@ -625,6 +644,7 @@ class NullXoidViewModel(
             streamBuffer = "",
             streamApproxTokens = 0,
             streamTokensPerSecond = 0.0,
+            lastStreamMetric = "",
             streamStatus = ""
         )
     }

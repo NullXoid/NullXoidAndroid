@@ -38,10 +38,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.model.ChatMessage
 import com.nullxoid.android.ui.AppUiState
+import com.nullxoid.android.ui.formatStreamMetric
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +67,12 @@ fun ChatScreen(
 ) {
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    fun sendDraft() {
+        val text = draft
+        if (text.isBlank() || state.streaming) return
+        draft = ""
+        onSend(text)
+    }
 
     val renderedList = buildList {
         addAll(state.activeMessages)
@@ -97,6 +113,12 @@ fun ChatScreen(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                        } else if (state.lastStreamMetric.isNotBlank()) {
+                            Text(
+                                state.lastStreamMetric,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 },
@@ -130,8 +152,18 @@ fun ChatScreen(
                             onValueChange = { draft = it },
                             modifier = Modifier
                                 .weight(1f)
+                                .onPreviewKeyEvent { event ->
+                                    if (event.key == Key.Enter && !event.isShiftPressed) {
+                                        if (event.type == KeyEventType.KeyUp) sendDraft()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
                                 .testTag("chat-message-input"),
                             placeholder = { Text("Message...") },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { sendDraft() }),
                             maxLines = 6,
                             enabled = !state.streaming
                         )
@@ -141,11 +173,7 @@ fun ChatScreen(
                         } else {
                             IconButton(
                                 modifier = Modifier.testTag("chat-send"),
-                                onClick = {
-                                    val text = draft
-                                    draft = ""
-                                    onSend(text)
-                                },
+                                onClick = { sendDraft() },
                                 enabled = draft.isNotBlank()
                             ) { Icon(Icons.AutoMirrored.Filled.Send, "send") }
                         }
@@ -210,16 +238,18 @@ fun ChatScreen(
 }
 
 private fun streamingAssistantText(state: AppUiState): String {
-    val text = state.streamBuffer.ifBlank { "Thinking..." }
-    return "$text\n\n${streamMetricLabel(state)}"
+    return state.streamBuffer.ifBlank { "Thinking..." }
 }
 
 private fun streamMetricLabel(state: AppUiState): String {
     val status = state.streamStatus.ifBlank {
         if (state.streamBuffer.isBlank()) "Thinking" else "Streaming"
     }
-    val speed = String.format(java.util.Locale.US, "%.1f", state.streamTokensPerSecond)
-    return "$status | tokens ~${state.streamApproxTokens} | $speed tok/s"
+    return formatStreamMetric(
+        status = status,
+        tokens = state.streamApproxTokens,
+        tokensPerSecond = state.streamTokensPerSecond
+    )
 }
 
 @Composable

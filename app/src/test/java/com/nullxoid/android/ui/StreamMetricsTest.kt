@@ -10,4 +10,12 @@ class StreamMetricsTest {
         assertEquals(1, estimateStreamTokens("hi"))
         assertEquals(3, estimateStreamTokens("hello world"))
     }
+
+    @Test
+    fun formatsStreamMetricForDisplay() {
+        assertEquals(
+            "Done | tokens ~12 | 3.5 tok/s",
+            formatStreamMetric(status = "Done", tokens = 12, tokensPerSecond = 3.456)
+        )
+    }
 }
