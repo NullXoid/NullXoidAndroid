@@ -283,9 +283,35 @@ class NullXoidViewModel(
 
     fun refreshChats() {
         viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null)
             runCatching { repo.chats() }
-                .onSuccess { _state.value = _state.value.copy(chats = it) }
-                .onFailure { t -> _state.value = _state.value.copy(error = t.message) }
+                .onSuccess { _state.value = _state.value.copy(loading = false, chats = it) }
+                .onFailure { t -> _state.value = _state.value.copy(loading = false, error = t.message) }
+        }
+    }
+
+    fun refreshActiveChat() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null, notice = null)
+            runCatching { repo.chats() }
+                .onSuccess { chats ->
+                    val activeId = _state.value.activeChat?.id
+                    val refreshedActive = activeId?.let { id -> chats.firstOrNull { it.id == id } }
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        chats = chats,
+                        activeChat = refreshedActive ?: _state.value.activeChat,
+                        activeMessages = refreshedActive?.session?.messages
+                            ?: _state.value.activeMessages,
+                        streamBuffer = ""
+                    )
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        error = t.message ?: "Refresh failed"
+                    )
+                }
         }
     }
 

@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,6 +51,7 @@ fun ChatScreen(
     onBack: () -> Unit,
     onSend: (String) -> Unit,
     onCancel: () -> Unit,
+    onRefresh: () -> Unit,
     onRefreshModels: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
@@ -126,7 +128,11 @@ fun ChatScreen(
             }
         }
     ) { inner ->
-        Box(Modifier.padding(inner).fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = state.loading,
+            onRefresh = onRefresh,
+            modifier = Modifier.padding(inner).fillMaxSize()
+        ) {
             if (renderedList.isEmpty()) {
                 Column(
                     Modifier.fillMaxSize().padding(24.dp),

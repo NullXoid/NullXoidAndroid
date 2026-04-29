@@ -136,6 +136,7 @@ fun NullXoidApp(
                         },
                         onSend = vm::sendMessage,
                         onCancel = vm::cancelStream,
+                        onRefresh = vm::refreshActiveChat,
                         onRefreshModels = vm::refreshModels,
                         onOpenSettings = { nav.navigate(Routes.Settings) }
                     )
