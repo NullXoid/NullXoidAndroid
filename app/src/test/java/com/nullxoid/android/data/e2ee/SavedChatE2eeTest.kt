@@ -93,6 +93,24 @@ class SavedChatE2eeTest {
     }
 
     @Test
+    fun syncedSavedChatEnvelopeRequiresAccountWrappedKeyWhenRequested() {
+        try {
+            SavedChatE2ee.envelope(
+                tenantId = "default",
+                userId = "shared-user",
+                title = "shared mobile chat",
+                messages = listOf(ChatMessage(role = "user", content = "private mobile prompt")),
+                keyProvider = FakeKeyProvider(),
+                accountKeyProvider = null,
+                requireAccountWrapped = true
+            )
+            throw AssertionError("Expected shared saved-chat key requirement")
+        } catch (err: IllegalArgumentException) {
+            assertTrue(err.message.orEmpty().contains("shared saved-chat E2EE key"))
+        }
+    }
+
+    @Test
     fun savedChatEnvelopeInspectionClassifiesLocalAndroidKey() {
         val envelope = SavedChatE2ee.envelope(
             tenantId = "default",

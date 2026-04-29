@@ -557,6 +557,13 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(error = "Select a model first")
             return
         }
+        if (!repo.hasSharedSavedChatKey()) {
+            _state.value = _state.value.copy(
+                error = "Import the shared saved-chat E2EE key in Settings before sending synced encrypted chats.",
+                lastFailedPrompt = trimmed
+            )
+            return
+        }
         val userMsg = ChatMessage(role = "user", content = trimmed, createdAt = nowIsoTimestamp())
         val previousHistory = _state.value.activeMessages
         val previousChat = _state.value.activeChat

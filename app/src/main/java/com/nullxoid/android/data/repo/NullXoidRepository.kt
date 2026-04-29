@@ -248,6 +248,13 @@ class NullXoidRepository(
         return epoch
     }
 
+    fun hasSharedSavedChatKey(): Boolean {
+        val auth = _auth.value
+        if (auth.tenantId.isNullOrBlank() || auth.userId.isNullOrBlank()) return false
+        return savedChatAccountKeyProvider
+            ?.preferredAccountKey(auth.tenantId.orEmpty(), auth.userId.orEmpty()) != null
+    }
+
     fun streamReply(
         model: String,
         messages: List<ChatMessage>,
@@ -305,7 +312,8 @@ class NullXoidRepository(
             title = title,
             messages = messages,
             keyProvider = savedChatKeyProvider,
-            accountKeyProvider = savedChatAccountKeyProvider
+            accountKeyProvider = savedChatAccountKeyProvider,
+            requireAccountWrapped = true
         )
     }
 

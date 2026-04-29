@@ -77,7 +77,8 @@ object SavedChatE2ee {
         title: String,
         messages: List<ChatMessage>,
         keyProvider: SavedChatKeyProvider,
-        accountKeyProvider: SavedChatAccountKeyProvider? = null
+        accountKeyProvider: SavedChatAccountKeyProvider? = null,
+        requireAccountWrapped: Boolean = false
     ): JsonObject {
         val cleartext = json.encodeToString(SavedChatPayload(title = title, messages = messages))
             .toByteArray(Charsets.UTF_8)
@@ -89,6 +90,9 @@ object SavedChatE2ee {
                 accountKey = accountKey.key,
                 cleartext = cleartext
             )
+        }
+        require(!requireAccountWrapped) {
+            "Import the shared saved-chat E2EE key before syncing encrypted chats across devices."
         }
         val encrypted = keyProvider.encrypt(
             tenantId = tenantId,
