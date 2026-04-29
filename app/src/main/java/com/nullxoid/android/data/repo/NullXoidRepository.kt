@@ -304,7 +304,8 @@ class NullXoidRepository(
             userId = userId,
             title = title,
             messages = messages,
-            keyProvider = savedChatKeyProvider
+            keyProvider = savedChatKeyProvider,
+            accountKeyProvider = savedChatAccountKeyProvider
         )
     }
 

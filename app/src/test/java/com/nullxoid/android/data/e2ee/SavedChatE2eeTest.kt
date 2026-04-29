@@ -61,6 +61,38 @@ class SavedChatE2eeTest {
     }
 
     @Test
+    fun savedChatEnvelopeUsesAccountWrappedKeyWhenAccountEpochKeyIsAvailable() {
+        val tenantId = "default"
+        val userId = "shared-user"
+        val accountKey = ByteArray(32) { (it + 9).toByte() }
+        val envelope = SavedChatE2ee.envelope(
+            tenantId = tenantId,
+            userId = userId,
+            title = "shared mobile chat",
+            messages = listOf(ChatMessage(role = "user", content = "private mobile prompt")),
+            keyProvider = FakeKeyProvider(),
+            accountKeyProvider = StaticAccountKeyProvider(accountKey, epoch = 2)
+        )
+
+        val savedChat = envelope["saved_chat"]!!.jsonObject
+        assertEquals("account_epoch_wrapped_saved_chat_key_v1", savedChat["key_envelope"]!!.jsonPrimitive.content)
+        assertEquals("zero_knowledge_device_setup", savedChat["key_storage"]!!.jsonPrimitive.content)
+        assertEquals(2, savedChat["epoch"]!!.jsonPrimitive.content.toInt())
+        assertTrue(savedChat["wrapped_key"]!!.jsonObject["ciphertext"]!!.jsonPrimitive.content.isNotBlank())
+        assertFalse(savedChat.toString().contains("private mobile prompt"))
+
+        val payload = SavedChatE2ee.decryptPayload(
+            tenantId = tenantId,
+            userId = userId,
+            e2ee = envelope,
+            keyProvider = FakeKeyProvider(),
+            accountKeyProvider = StaticAccountKeyProvider(accountKey, epoch = 2)
+        )
+        assertEquals("shared mobile chat", payload?.title)
+        assertEquals("private mobile prompt", payload?.messages?.single()?.content)
+    }
+
+    @Test
     fun savedChatEnvelopeInspectionClassifiesLocalAndroidKey() {
         val envelope = SavedChatE2ee.envelope(
             tenantId = "default",
@@ -187,7 +219,7 @@ class SavedChatE2eeTest {
             userId = userId,
             e2ee = envelope,
             keyProvider = FakeKeyProvider(),
-            accountKeyProvider = StaticAccountKeyProvider(accountKey)
+            accountKeyProvider = StaticAccountKeyProvider(accountKey, epoch = epoch)
         )
 
         assertEquals("Shared private title", payload?.title)
@@ -308,8 +340,12 @@ class SavedChatE2eeTest {
         ): ByteArray = encrypted.ciphertext.reversedArray()
     }
 
-    private class StaticAccountKeyProvider(private val key: ByteArray) : SavedChatAccountKeyProvider {
-        override fun accountKey(tenantId: String, userId: String, epoch: Int): ByteArray = key
+    private class StaticAccountKeyProvider(private val key: ByteArray, private val epoch: Int = 1) : SavedChatAccountKeyProvider {
+        override fun accountKey(tenantId: String, userId: String, epoch: Int): ByteArray? =
+            if (epoch == this.epoch) key else null
+
+        override fun preferredAccountKey(tenantId: String, userId: String): AccountEpochKey =
+            AccountEpochKey(epoch = epoch, key = key)
     }
 
     private data class TestEncrypted(val nonce: ByteArray, val ciphertext: ByteArray)

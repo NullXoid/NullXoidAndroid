@@ -32,6 +32,12 @@ class AndroidSavedChatAccountKeyProvider(context: Context) : SavedChatAccountKey
         }.getOrNull()?.takeIf { it.size == ACCOUNT_KEY_BYTES }
     }
 
+    override fun preferredAccountKey(tenantId: String, userId: String): AccountEpochKey? {
+        val epoch = prefs.getInt(latestEpochKey(tenantId, userId), 1).coerceAtLeast(1)
+        accountKey(tenantId, userId, epoch)?.let { return AccountEpochKey(epoch = epoch, key = it) }
+        return accountKey(tenantId, userId, 1)?.let { AccountEpochKey(epoch = 1, key = it) }
+    }
+
     override fun storeAccountKey(tenantId: String, userId: String, epoch: Int, accountKey: ByteArray) {
         require(accountKey.size == ACCOUNT_KEY_BYTES) { "Account epoch key must be 32 bytes." }
         val storageKey = storageKey(tenantId, userId, epoch)
@@ -42,6 +48,7 @@ class AndroidSavedChatAccountKeyProvider(context: Context) : SavedChatAccountKey
         prefs.edit()
             .putString("$storageKey:nonce", cipher.iv.base64())
             .putString("$storageKey:ciphertext", ciphertext.base64())
+            .putInt(latestEpochKey(tenantId, userId), epoch)
             .apply()
     }
 
@@ -55,6 +62,9 @@ class AndroidSavedChatAccountKeyProvider(context: Context) : SavedChatAccountKey
             .remove("$storageKey:ciphertext")
             .apply()
     }
+
+    private fun latestEpochKey(tenantId: String, userId: String): String =
+        "latest_epoch:${storageKey(tenantId, userId, 0).substringAfter(':')}"
 
     private fun getOrCreateWrapKey(alias: String): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }

@@ -5,6 +5,7 @@ import android.security.keystore.KeyProperties
 import com.nullxoid.android.data.model.ChatMessage
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -33,6 +34,8 @@ interface SavedChatKeyProvider {
 
 interface SavedChatAccountKeyProvider {
     fun accountKey(tenantId: String, userId: String, epoch: Int): ByteArray?
+    fun preferredAccountKey(tenantId: String, userId: String): AccountEpochKey? =
+        accountKey(tenantId, userId, 1)?.let { AccountEpochKey(epoch = 1, key = it) }
 }
 
 interface SavedChatAccountKeyStore : SavedChatAccountKeyProvider {
@@ -43,6 +46,11 @@ interface SavedChatAccountKeyStore : SavedChatAccountKeyProvider {
 data class EncryptedBytes(
     val nonce: ByteArray,
     val ciphertext: ByteArray
+)
+
+data class AccountEpochKey(
+    val epoch: Int,
+    val key: ByteArray
 )
 
 object SavedChatE2ee {
@@ -56,6 +64,7 @@ object SavedChatE2ee {
     private const val ACCOUNT_WRAPPED_KEY_ENVELOPE = "account_epoch_wrapped_saved_chat_key_v1"
     private const val RECOVERY_ITERATIONS = 210_000
     private const val ACCOUNT_KEY_BYTES = 32
+    private const val CHAT_E2EE_VERSION = 1
 
     private val json = Json {
         encodeDefaults = true
@@ -67,10 +76,20 @@ object SavedChatE2ee {
         userId: String,
         title: String,
         messages: List<ChatMessage>,
-        keyProvider: SavedChatKeyProvider
+        keyProvider: SavedChatKeyProvider,
+        accountKeyProvider: SavedChatAccountKeyProvider? = null
     ): JsonObject {
         val cleartext = json.encodeToString(SavedChatPayload(title = title, messages = messages))
             .toByteArray(Charsets.UTF_8)
+        accountKeyProvider?.preferredAccountKey(tenantId, userId)?.let { accountKey ->
+            return accountWrappedEnvelope(
+                tenantId = tenantId,
+                userId = userId,
+                epoch = accountKey.epoch,
+                accountKey = accountKey.key,
+                cleartext = cleartext
+            )
+        }
         val encrypted = keyProvider.encrypt(
             tenantId = tenantId,
             userId = userId,
@@ -92,6 +111,66 @@ object SavedChatE2ee {
                     put("aad", AAD)
                     put("nonce", encrypted.nonce.base64())
                     put("ciphertext", encrypted.ciphertext.base64())
+                }
+            )
+        }
+    }
+
+    private fun accountWrappedEnvelope(
+        tenantId: String,
+        userId: String,
+        epoch: Int,
+        accountKey: ByteArray,
+        cleartext: ByteArray
+    ): JsonObject {
+        require(accountKey.size == ACCOUNT_KEY_BYTES) { "Account epoch key must be $ACCOUNT_KEY_BYTES bytes." }
+        val contentKey = randomBytes(ACCOUNT_KEY_BYTES)
+        val encrypted = encryptAesGcm(
+            keyBytes = contentKey,
+            plaintext = cleartext,
+            aad = accountWrappedSavedChatAad(tenantId, userId, epoch).toByteArray(Charsets.UTF_8)
+        )
+        val wrappedKeyPayload = buildJsonObject {
+            put("version", CHAT_E2EE_VERSION)
+            put("purpose", "saved_chat_content_key")
+            put("content_key", contentKey.base64Url())
+        }.toString().toByteArray(Charsets.UTF_8)
+        val wrappedKey = encryptAesGcm(
+            keyBytes = accountKey,
+            plaintext = wrappedKeyPayload,
+            aad = accountEpochAad(tenantId, userId, epoch).toByteArray(Charsets.UTF_8)
+        )
+        val accountKeyId = accountRootKeyId(accountKey)
+        return buildJsonObject {
+            put(
+                "saved_chat",
+                buildJsonObject {
+                    put("version", CHAT_E2EE_VERSION)
+                    put("algorithm", "AES-GCM")
+                    put("boundary", "client_or_device")
+                    put("key_scope", "account_epoch_wrapped_saved_chat_key")
+                    put("key_envelope", ACCOUNT_WRAPPED_KEY_ENVELOPE)
+                    put("key_storage", "zero_knowledge_device_setup")
+                    put("key_extractable", "wrapped_only")
+                    put("key_id", accountKeyId)
+                    put("epoch", epoch)
+                    put("aad", "saved_chats_scope_v1")
+                    put("nonce", encrypted.nonce.base64Url())
+                    put("ciphertext", encrypted.ciphertext.base64Url())
+                    put(
+                        "wrapped_key",
+                        buildJsonObject {
+                            put("version", CHAT_E2EE_VERSION)
+                            put("algorithm", "AES-GCM")
+                            put("boundary", "account_epoch_key")
+                            put("key_scope", "active_non_revoked_devices")
+                            put("epoch", epoch)
+                            put("key_id", accountKeyId)
+                            put("plaintext_storage", "forbidden")
+                            put("nonce", wrappedKey.nonce.base64Url())
+                            put("ciphertext", wrappedKey.ciphertext.base64Url())
+                        }
+                    )
                 }
             )
         }
@@ -328,6 +407,35 @@ private fun decryptAesGcm(
     cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(128, nonce))
     cipher.updateAAD(aad)
     return cipher.doFinal(ciphertext)
+}
+
+private fun encryptAesGcm(
+    keyBytes: ByteArray,
+    plaintext: ByteArray,
+    aad: ByteArray
+): EncryptedBytes {
+    val nonce = ByteArray(12).also { SavedChatE2eeRandom.nextBytes(it) }
+    val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+    cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(128, nonce))
+    cipher.updateAAD(aad)
+    return EncryptedBytes(nonce = nonce, ciphertext = cipher.doFinal(plaintext))
+}
+
+private fun randomBytes(size: Int): ByteArray =
+    ByteArray(size).also { SavedChatE2eeRandom.nextBytes(it) }
+
+private object SavedChatE2eeRandom {
+    private val secureRandom = SecureRandom()
+
+    fun nextBytes(bytes: ByteArray) = secureRandom.nextBytes(bytes)
+}
+
+private fun accountRootKeyId(accountKey: ByteArray): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+        .digest(accountKey)
+        .base64Url()
+        .take(22)
+    return "account-root-key:$digest"
 }
 
 private fun canonicalJson(value: Any?): String = when (value) {
