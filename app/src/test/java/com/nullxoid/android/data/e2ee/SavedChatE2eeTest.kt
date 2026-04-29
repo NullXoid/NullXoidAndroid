@@ -191,6 +191,63 @@ class SavedChatE2eeTest {
         assertEquals("private prompt", payload?.messages?.single()?.content)
     }
 
+    @Test
+    fun accountWrappedSavedChatEnvelopeStaysLockedWithoutAccountEpochKey() {
+        val tenantId = "default"
+        val userId = "shared-user"
+        val epoch = 3
+        val accountKey = ByteArray(32) { (it + 1).toByte() }
+        val contentKey = ByteArray(32) { (it + 41).toByte() }
+        val wrappedEncrypted = encryptAesGcm(
+            key = accountKey,
+            nonce = ByteArray(12) { (it + 7).toByte() },
+            aad = SavedChatE2ee.accountEpochAad(tenantId, userId, epoch),
+            plaintext = """{"version":1,"purpose":"saved_chat_content_key","content_key":"${contentKey.base64Url()}"}"""
+        )
+        val savedEncrypted = encryptAesGcm(
+            key = contentKey,
+            nonce = ByteArray(12) { (it + 19).toByte() },
+            aad = SavedChatE2ee.accountWrappedSavedChatAad(tenantId, userId, epoch),
+            plaintext = """{"title":"Shared private title","messages":[]}"""
+        )
+        val envelope = buildJsonObject {
+            put(
+                "saved_chat",
+                buildJsonObject {
+                    put("version", 1)
+                    put("algorithm", "AES-GCM")
+                    put("boundary", "client_or_device")
+                    put("key_envelope", "account_epoch_wrapped_saved_chat_key_v1")
+                    put("key_id", "account-root-key:shared")
+                    put("epoch", epoch)
+                    put("nonce", savedEncrypted.nonce.base64Url())
+                    put("ciphertext", savedEncrypted.ciphertext.base64Url())
+                    put(
+                        "wrapped_key",
+                        buildJsonObject {
+                            put("version", 1)
+                            put("algorithm", "AES-GCM")
+                            put("epoch", epoch)
+                            put("plaintext_storage", "forbidden")
+                            put("nonce", wrappedEncrypted.nonce.base64Url())
+                            put("ciphertext", wrappedEncrypted.ciphertext.base64Url())
+                        }
+                    )
+                }
+            )
+        }
+
+        val payload = SavedChatE2ee.decryptPayload(
+            tenantId = tenantId,
+            userId = userId,
+            e2ee = envelope,
+            keyProvider = FakeKeyProvider()
+        )
+
+        assertEquals(null, payload)
+        assertEquals("account_epoch_wrapped_key", SavedChatE2ee.inspectEnvelope(envelope, localKeyId = null).status)
+    }
+
     private class FakeKeyProvider : SavedChatKeyProvider {
         override fun keyId(tenantId: String, userId: String): String = "test-key"
 
