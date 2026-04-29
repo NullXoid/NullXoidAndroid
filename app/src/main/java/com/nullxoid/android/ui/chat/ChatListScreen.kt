@@ -146,7 +146,7 @@ private fun ChatRow(chat: ChatRecord, onClick: () -> Unit) {
                     maxLines = 2
                 )
             }
-            chat.updatedAt?.let {
+            formatMessageTimestamp(chat.updatedAt ?: chat.createdAt)?.let {
                 Spacer(Modifier.height(4.dp))
                 Row { Text(it, style = MaterialTheme.typography.labelSmall) }
             }

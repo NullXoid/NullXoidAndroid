@@ -58,6 +58,11 @@ import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.model.ChatMessage
 import com.nullxoid.android.ui.AppUiState
 import com.nullxoid.android.ui.formatStreamMetric
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,7 +93,8 @@ fun ChatScreen(
             add(
                 ChatMessage(
                     role = "assistant",
-                    content = streamingAssistantText(state)
+                    content = streamingAssistantText(state),
+                    createdAt = Instant.now().toString()
                 )
             )
         }
@@ -201,7 +207,17 @@ fun ChatScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Start the conversation.", style = MaterialTheme.typography.bodyMedium)
+                    if (state.activeChat?.e2ee != null) {
+                        Text("Encrypted chat from another key.", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "This transcript exists on the backend, but this Android install cannot decrypt it yet. Cross-device key handoff is still on the E2EE roadmap.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text("Start the conversation.", style = MaterialTheme.typography.bodyMedium)
+                    }
                     Spacer(Modifier.height(8.dp))
                     if (state.selectedModel != null) {
                         AssistChip(onClick = {}, label = { Text(state.selectedModel) })
@@ -313,6 +329,14 @@ private fun MessageBubble(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(msg.content, color = fg, style = MaterialTheme.typography.bodyMedium)
+                formatMessageTimestamp(msg.createdAt)?.let { timestamp ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        timestamp,
+                        color = fg.copy(alpha = 0.65f),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
             }
         }
     }
@@ -335,7 +359,14 @@ private fun MessageDetailsSheet(
         ) {
             Text("Message", style = MaterialTheme.typography.titleMedium)
             Text(
-                "${msg.role.lowercase()} | ${msg.content.length} chars | tokens ~${estimateMessageTokens(msg.content)}",
+                buildString {
+                    append(msg.role.lowercase())
+                    formatMessageTimestamp(msg.createdAt)?.let { append(" | ").append(it) }
+                    append(" | ")
+                    append(msg.content.length)
+                    append(" chars | tokens ~")
+                    append(estimateMessageTokens(msg.content))
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -357,6 +388,18 @@ private fun MessageDetailsSheet(
 
 private fun estimateMessageTokens(text: String): Int =
     if (text.isBlank()) 0 else maxOf(1, (text.length + 3) / 4)
+
+internal fun formatMessageTimestamp(value: String?): String? {
+    val input = value?.trim().orEmpty()
+    if (input.isBlank()) return null
+    val instant = runCatching { Instant.parse(input) }.getOrNull()
+        ?: runCatching { OffsetDateTime.parse(input).toInstant() }.getOrNull()
+        ?: return input
+    return DateTimeFormatter
+        .ofPattern("MMM d, h:mm:ss a", Locale.US)
+        .withZone(ZoneId.systemDefault())
+        .format(instant)
+}
 
 @Suppress("unused")
 private val DebugTransparent = Color.Transparent

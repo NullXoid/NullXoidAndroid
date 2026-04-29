@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
 private const val OIDC_REDIRECT_URI = "nullxoid://auth/oidc/callback"
@@ -57,6 +58,8 @@ internal fun streamStatusLabel(status: String): String =
         "completed", "done", "complete" -> "Done"
         else -> status.replaceFirstChar { it.uppercase() }
     }
+
+internal fun nowIsoTimestamp(): String = Instant.now().toString()
 
 internal fun mobilePasskeySignInError(t: Throwable): String {
     val details = listOfNotNull(t.message, t::class.simpleName).joinToString(" ").lowercase()
@@ -514,7 +517,7 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(error = "Select a model first")
             return
         }
-        val userMsg = ChatMessage(role = "user", content = trimmed)
+        val userMsg = ChatMessage(role = "user", content = trimmed, createdAt = nowIsoTimestamp())
         val previousHistory = _state.value.activeMessages
         val previousChat = _state.value.activeChat
         val nextHistory = previousHistory + userMsg
@@ -613,7 +616,7 @@ class NullXoidViewModel(
                                 return@collect
                             }
                             val updated = _state.value.activeMessages +
-                                ChatMessage(role = "assistant", content = finalText)
+                                ChatMessage(role = "assistant", content = finalText, createdAt = nowIsoTimestamp())
                             val finalMetric = formatStreamMetric(
                                 status = "Done",
                                 tokens = _state.value.streamApproxTokens,
