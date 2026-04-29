@@ -34,7 +34,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
@@ -493,7 +495,9 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(passkeyLoading = true, error = null, notice = null)
             runCatching {
                 val bundle = importJson.parseToJsonElement(recoveryBundleJson.trim()).jsonObject
-                repo.importSavedChatRecoveryEnvelope(recoverySecret.trim(), bundle)
+                val bundledSecret = bundle["recovery_secret"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                val resolvedSecret = recoverySecret.trim().ifBlank { bundledSecret.trim() }
+                repo.importSavedChatRecoveryEnvelope(resolvedSecret, bundle)
             }
                 .onSuccess { epoch ->
                     val chats = runCatching { repo.chats() }.getOrDefault(_state.value.chats)
@@ -523,10 +527,10 @@ class NullXoidViewModel(
         return when {
             message.contains("unexpected JSON", ignoreCase = true) ||
                 message.contains("Expected", ignoreCase = true) ->
-                "Recovery bundle JSON is not valid. Paste the full Android bundle copied from web Settings > Privacy/Security > Copy Android bundle."
+                "Android import kit JSON is not valid. Paste the full kit copied from web Settings > Privacy/Security > Copy Android import kit."
             message.contains("BAD_DECRYPT", ignoreCase = true) ||
                 message.contains("did not unlock", ignoreCase = true) ->
-                "Saved-chat recovery did not unlock. Check that the recovery secret is the original browser recovery secret, not the Android bundle JSON, and that the bundle was copied from this same signed-in account."
+                "Saved-chat recovery did not unlock. Paste a fresh Android import kit copied from the same signed-in browser account, or use the matching recovery secret with the matching bundle."
             message.isNotBlank() -> message
             else -> "Saved-chat recovery import failed."
         }

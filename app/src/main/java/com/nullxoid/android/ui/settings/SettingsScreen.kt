@@ -232,14 +232,14 @@ fun SettingsScreen(
             Text("Saved-chat recovery", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Use two separate values from the same signed-in browser account: the recovery secret from device setup, plus the copied Android bundle JSON.",
+                "Paste the Android import kit copied from the signed-in browser. Older two-part bundles can still use the optional recovery secret field.",
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = recoverySecretDraft,
                 onValueChange = { recoverySecretDraft = it },
-                label = { Text("Recovery secret from browser") },
+                label = { Text("Recovery secret (optional)") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
@@ -250,7 +250,7 @@ fun SettingsScreen(
             OutlinedTextField(
                 value = recoveryEnvelopeDraft,
                 onValueChange = { recoveryEnvelopeDraft = it },
-                label = { Text("Android bundle JSON") },
+                label = { Text("Android import kit JSON") },
                 minLines = 3,
                 maxLines = 5,
                 modifier = Modifier
@@ -261,7 +261,6 @@ fun SettingsScreen(
             OutlinedButton(
                 modifier = Modifier.testTag("settings-recovery-import"),
                 enabled = state.auth.authenticated &&
-                    recoverySecretDraft.isNotBlank() &&
                     recoveryEnvelopeDraft.isNotBlank() &&
                     !state.passkeyLoading,
                 onClick = { onImportSavedChatRecovery(recoverySecretDraft, recoveryEnvelopeDraft) }
