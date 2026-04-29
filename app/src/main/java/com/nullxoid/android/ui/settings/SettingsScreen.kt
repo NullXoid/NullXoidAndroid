@@ -232,7 +232,7 @@ fun SettingsScreen(
             Text("Saved-chat recovery", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             Text(
-                "If you do not remember a recovery secret, use the web app: Settings > Privacy/Security > Copy Android import kit. Paste that full JSON below and leave the optional secret field blank.",
+                "If you do not remember a recovery secret, use the web app: Settings > Privacy/Security > Reset browser device setup, then Copy Android import kit. Paste that full JSON below and leave the optional secret field blank. The fresh JSON says \"kit_type\":\"one_paste_android_import\".",
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(8.dp))
@@ -250,7 +250,7 @@ fun SettingsScreen(
             OutlinedTextField(
                 value = recoveryEnvelopeDraft,
                 onValueChange = { recoveryEnvelopeDraft = it },
-                label = { Text("Android import kit JSON") },
+                label = { Text("Android import kit JSON (one-paste)") },
                 minLines = 3,
                 maxLines = 5,
                 modifier = Modifier

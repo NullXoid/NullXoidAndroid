@@ -493,12 +493,14 @@ class NullXoidViewModel(
         }
         viewModelScope.launch {
             _state.value = _state.value.copy(passkeyLoading = true, error = null, notice = null)
+            var importWasTwoPartBundle = false
             runCatching {
                 val bundle = importJson.parseToJsonElement(recoveryBundleJson.trim()).jsonObject
                 val bundledSecret = bundle["recovery_secret"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                importWasTwoPartBundle = bundledSecret.isBlank()
                 val resolvedSecret = recoverySecret.trim().ifBlank { bundledSecret.trim() }
                 require(resolvedSecret.isNotBlank()) {
-                    "This looks like an older two-part recovery bundle. Since you do not have the recovery secret, go to the web app, open Settings > Privacy/Security, click Copy Android import kit, then paste that full new JSON here with the recovery secret field blank."
+                    "This is an older two-part recovery bundle. Since you do not have the recovery secret, go to the web app, open Settings > Privacy/Security, click Copy Android import kit, then paste that full new JSON here with the recovery secret field blank. The new JSON says \"kit_type\":\"one_paste_android_import\" and includes \"recovery_secret\"."
                 }
                 repo.importSavedChatRecoveryEnvelope(resolvedSecret, bundle)
             }
@@ -518,14 +520,14 @@ class NullXoidViewModel(
                 .onFailure { t ->
                     _state.value = _state.value.copy(
                         passkeyLoading = false,
-                        error = savedChatRecoveryImportError(t),
+                        error = savedChatRecoveryImportError(t, importWasTwoPartBundle),
                         notice = null
                     )
                 }
         }
     }
 
-    private fun savedChatRecoveryImportError(t: Throwable): String {
+    private fun savedChatRecoveryImportError(t: Throwable, importWasTwoPartBundle: Boolean = false): String {
         val message = t.message.orEmpty()
         return when {
             message.contains("unexpected JSON", ignoreCase = true) ||
@@ -533,8 +535,12 @@ class NullXoidViewModel(
                 "Android import kit JSON is not valid. Paste the full kit copied from web Settings > Privacy/Security > Copy Android import kit."
             message.contains("BAD_DECRYPT", ignoreCase = true) ||
                 message.contains("did not unlock", ignoreCase = true) ->
-                "Saved-chat recovery did not unlock. Paste a fresh Android import kit copied from the same signed-in browser account, or use the matching recovery secret with the matching bundle."
-            message.contains("older two-part recovery bundle", ignoreCase = true) -> message
+                if (importWasTwoPartBundle) {
+                    "This is a two-part recovery bundle and the recovery secret entered here did not match it. If you do not know the exact secret, copy a fresh one-paste Android import kit from the web app. The fresh JSON says \"kit_type\":\"one_paste_android_import\" and includes \"recovery_secret\"; leave the Recovery secret field blank."
+                } else {
+                    "Saved-chat recovery did not unlock. Paste a fresh one-paste Android import kit copied from the same signed-in browser account. The JSON should say \"kit_type\":\"one_paste_android_import\" and include \"recovery_secret\"."
+                }
+            message.contains("two-part recovery bundle", ignoreCase = true) -> message
             message.isNotBlank() -> message
             else -> "Saved-chat recovery import failed."
         }
