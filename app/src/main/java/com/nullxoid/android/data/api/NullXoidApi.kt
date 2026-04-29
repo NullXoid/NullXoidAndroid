@@ -153,7 +153,24 @@ class NullXoidApi(
 
     // ---- Chats ----------------------------------------------------------
 
-    suspend fun chats(): ChatListResponse = getJson("/api/chats")
+    suspend fun chats(
+        tenantId: String,
+        userId: String,
+        workspaceId: String? = null,
+        archived: Boolean = false
+    ): ChatListResponse {
+        val params = mutableListOf(
+            "tenant_id=${urlEncode(tenantId)}",
+            "user_id=${urlEncode(userId)}"
+        )
+        if (!workspaceId.isNullOrBlank()) {
+            params += "workspace_id=${urlEncode(workspaceId)}"
+        }
+        if (archived) {
+            params += "archived=true"
+        }
+        return getJson("/api/chats?${params.joinToString("&")}")
+    }
 
     suspend fun createChat(req: ChatCreateRequest): ChatRecord {
         val payloadStr = json.encodeToString(ChatCreateRequest.serializer(), req)
@@ -175,6 +192,9 @@ class NullXoidApi(
         sendNoBody("POST", "/api/chats/$chatId/archive?archived=$archived")
     }
 }
+
+private fun urlEncode(value: String): String =
+    URLEncoder.encode(value, StandardCharsets.UTF_8.name())
 
 class ApiException(val code: Int, val body: String) :
     RuntimeException("HTTP $code: ${body.take(200)}")

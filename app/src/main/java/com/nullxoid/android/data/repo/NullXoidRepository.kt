@@ -131,7 +131,15 @@ class NullXoidRepository(
 
     suspend fun models(): List<ModelDescriptor> = api.models().models
 
-    suspend fun chats(): List<ChatRecord> = api.chats().chats
+    suspend fun chats(): List<ChatRecord> {
+        val auth = requireScopedAuth()
+        val context = resolveChatContext()
+        return api.chats(
+            tenantId = auth.tenantId.orEmpty(),
+            userId = auth.userId.orEmpty(),
+            workspaceId = context.workspaceId
+        ).chats
+    }
 
     suspend fun createChat(
         title: String,

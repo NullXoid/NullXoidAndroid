@@ -71,6 +71,7 @@ class ChatStream(
 
         val frameBuilder = StringBuilder()
         try {
+            var terminalEventSeen = false
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
                 if (line.isEmpty()) {
@@ -79,12 +80,15 @@ class ChatStream(
                     if (frame.isBlank()) continue
                     val event = parseFrame(frame)
                     if (event != null) trySend(event)
-                    if (event is StreamEvent.Completed || event is StreamEvent.Error) break
+                    if (event is StreamEvent.Completed || event is StreamEvent.Error) {
+                        terminalEventSeen = true
+                        break
+                    }
                 } else {
                     frameBuilder.append(line).append('\n')
                 }
             }
-            trySend(StreamEvent.Completed)
+            if (!terminalEventSeen) trySend(StreamEvent.Completed)
         } catch (t: Throwable) {
             trySend(StreamEvent.Error(t.message ?: "stream interrupted"))
         } finally {
