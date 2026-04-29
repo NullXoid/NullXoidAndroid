@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -94,7 +94,7 @@ fun ChatScreen(
                 ChatMessage(
                     role = "assistant",
                     content = streamingAssistantText(state),
-                    createdAt = Instant.now().toString()
+                    createdAt = streamingAssistantCreatedAt(state)
                 )
             )
         }
@@ -254,9 +254,18 @@ fun ChatScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(renderedList) { msg ->
+                    itemsIndexed(renderedList) { index, msg ->
+                        val previousUserCreatedAt = if (msg.role.equals("assistant", ignoreCase = true)) {
+                            renderedList
+                                .take(index)
+                                .lastOrNull { it.role.equals("user", ignoreCase = true) }
+                                ?.createdAt
+                        } else {
+                            null
+                        }
                         MessageBubble(
                             msg = msg,
+                            previousUserCreatedAt = previousUserCreatedAt,
                             onClick = { selectedMessage = msg }
                         )
                     }
@@ -290,6 +299,12 @@ private fun streamingAssistantText(state: AppUiState): String {
     return state.streamBuffer.ifBlank { "Thinking..." }
 }
 
+private fun streamingAssistantCreatedAt(state: AppUiState): String? {
+    return state.streamStartedAtMs
+        .takeIf { it > 0L }
+        ?.let { Instant.ofEpochMilli(it).toString() }
+}
+
 private fun streamMetricLabel(state: AppUiState): String {
     val status = state.streamStatus.ifBlank {
         if (state.streamBuffer.isBlank()) "Thinking" else "Streaming"
@@ -304,6 +319,7 @@ private fun streamMetricLabel(state: AppUiState): String {
 @Composable
 private fun MessageBubble(
     msg: ChatMessage,
+    previousUserCreatedAt: String?,
     onClick: () -> Unit
 ) {
     val isUser = msg.role.equals("user", ignoreCase = true)
@@ -329,7 +345,10 @@ private fun MessageBubble(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(msg.content, color = fg, style = MaterialTheme.typography.bodyMedium)
-                formatMessageTimestamp(msg.createdAt)?.let { timestamp ->
+                formatMessageTiming(
+                    createdAt = msg.createdAt,
+                    previousUserCreatedAt = previousUserCreatedAt
+                )?.let { timestamp ->
                     Spacer(Modifier.height(6.dp))
                     Text(
                         timestamp,
@@ -392,13 +411,33 @@ private fun estimateMessageTokens(text: String): Int =
 internal fun formatMessageTimestamp(value: String?): String? {
     val input = value?.trim().orEmpty()
     if (input.isBlank()) return null
-    val instant = runCatching { Instant.parse(input) }.getOrNull()
-        ?: runCatching { OffsetDateTime.parse(input).toInstant() }.getOrNull()
-        ?: return input
+    val instant = parseMessageInstant(input) ?: return input
     return DateTimeFormatter
         .ofPattern("MMM d, h:mm:ss a", Locale.US)
         .withZone(ZoneId.systemDefault())
         .format(instant)
+}
+
+internal fun formatMessageTiming(createdAt: String?, previousUserCreatedAt: String?): String? {
+    val timestamp = formatMessageTimestamp(createdAt) ?: return null
+    val responseInstant = parseMessageInstant(createdAt) ?: return timestamp
+    val userInstant = parseMessageInstant(previousUserCreatedAt) ?: return timestamp
+    val latencyMs = responseInstant.toEpochMilli() - userInstant.toEpochMilli()
+    if (latencyMs < 0L) return timestamp
+    val latencySeconds = latencyMs / 1000.0
+    val latency = if (latencySeconds < 10) {
+        String.format(Locale.US, "%.1fs", latencySeconds)
+    } else {
+        "${latencySeconds.toInt()}s"
+    }
+    return "$timestamp | +$latency"
+}
+
+private fun parseMessageInstant(value: String?): Instant? {
+    val input = value?.trim().orEmpty()
+    if (input.isBlank()) return null
+    return runCatching { Instant.parse(input) }.getOrNull()
+        ?: runCatching { OffsetDateTime.parse(input).toInstant() }.getOrNull()
 }
 
 @Suppress("unused")
