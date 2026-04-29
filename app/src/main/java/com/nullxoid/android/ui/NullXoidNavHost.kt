@@ -139,7 +139,9 @@ fun NullXoidApp(
                             nav.popBackStack()
                         },
                         onSend = vm::sendMessage,
-                        onCancel = vm::cancelStream
+                        onCancel = vm::cancelStream,
+                        onRefreshModels = vm::refreshModels,
+                        onOpenSettings = { nav.navigate(Routes.Settings) }
                     )
                 }
                 composable(Routes.Settings) {

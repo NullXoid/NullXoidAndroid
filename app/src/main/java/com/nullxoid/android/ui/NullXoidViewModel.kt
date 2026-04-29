@@ -161,6 +161,17 @@ class NullXoidViewModel(
         viewModelScope.launch {
             repo.setBackendUrl(url)
             _state.value = _state.value.copy(backendUrl = url)
+            runCatching { repo.health() }.onSuccess { health ->
+                _state.value = _state.value.copy(health = health)
+            }
+            if (_state.value.auth.authenticated) {
+                runCatching { repo.models() }.onSuccess { list ->
+                    _state.value = _state.value.copy(
+                        models = list,
+                        selectedModel = selectUsableModel(_state.value.selectedModel, list)
+                    )
+                }
+            }
         }
     }
 
@@ -283,7 +294,7 @@ class NullXoidViewModel(
                 .onSuccess { list ->
                     _state.value = _state.value.copy(
                         models = list,
-                        selectedModel = _state.value.selectedModel ?: list.firstOrNull()?.id
+                        selectedModel = selectUsableModel(_state.value.selectedModel, list)
                     )
                 }
                 .onFailure { t -> _state.value = _state.value.copy(error = t.message) }
@@ -674,7 +685,7 @@ class NullXoidViewModel(
         runCatching { repo.models() }.onSuccess { list ->
             _state.value = _state.value.copy(
                 models = list,
-                selectedModel = _state.value.selectedModel ?: list.firstOrNull()?.id
+                selectedModel = selectUsableModel(_state.value.selectedModel, list)
             )
         }
         runCatching { repo.chats() }.onSuccess { chats ->
@@ -689,6 +700,14 @@ class NullXoidViewModel(
                 passkeyCredentials = response.credentials
             )
         }
+    }
+
+    private fun selectUsableModel(
+        current: String?,
+        models: List<ModelDescriptor>
+    ): String? {
+        if (current != null && models.any { it.id == current }) return current
+        return models.firstOrNull()?.id
     }
 
     class Factory(

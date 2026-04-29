@@ -49,7 +49,9 @@ fun ChatScreen(
     state: AppUiState,
     onBack: () -> Unit,
     onSend: (String) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onRefreshModels: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -133,7 +135,28 @@ fun ChatScreen(
                 ) {
                     Text("Start the conversation.", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
-                    state.selectedModel?.let { AssistChip(onClick = {}, label = { Text(it) }) }
+                    if (state.selectedModel != null) {
+                        AssistChip(onClick = {}, label = { Text(state.selectedModel) })
+                    } else {
+                        Text(
+                            "No model is selected yet.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AssistChip(
+                                modifier = Modifier.testTag("chat-refresh-models"),
+                                onClick = onRefreshModels,
+                                label = { Text("Refresh models") }
+                            )
+                            AssistChip(
+                                modifier = Modifier.testTag("chat-open-settings"),
+                                onClick = onOpenSettings,
+                                label = { Text("Settings") }
+                            )
+                        }
+                    }
                 }
             } else {
                 LazyColumn(
