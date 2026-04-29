@@ -37,6 +37,7 @@ object SavedChatE2ee {
     private const val ANDROID_KEY_ENVELOPE = "android_keystore_aes_gcm_v1"
     private const val BROWSER_INDEXEDDB_KEY_ENVELOPE = "device_indexeddb_non_extractable_v1"
     private const val BROWSER_LOCAL_STORAGE_KEY_ENVELOPE = "device_local_storage_fallback_v1"
+    private const val ACCOUNT_WRAPPED_KEY_ENVELOPE = "account_epoch_wrapped_saved_chat_key_v1"
 
     private val json = Json {
         encodeDefaults = true
@@ -110,6 +111,7 @@ object SavedChatE2ee {
             keyEnvelope == ANDROID_KEY_ENVELOPE -> "android_other_install"
             keyEnvelope == BROWSER_INDEXEDDB_KEY_ENVELOPE -> "browser_indexeddb_key"
             keyEnvelope == BROWSER_LOCAL_STORAGE_KEY_ENVELOPE -> "browser_local_storage_key"
+            keyEnvelope == ACCOUNT_WRAPPED_KEY_ENVELOPE -> "account_epoch_wrapped_key"
             keyEnvelope.isBlank() -> "missing_key_envelope"
             else -> "unsupported_key_envelope"
         }

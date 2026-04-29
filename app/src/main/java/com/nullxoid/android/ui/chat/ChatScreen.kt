@@ -300,6 +300,8 @@ private fun streamingAssistantText(state: AppUiState): String {
 }
 
 private fun lockedChatDetail(status: String?): String = when (status) {
+    "account_epoch_wrapped_key" ->
+        "This transcript uses the shared saved-chat E2EE envelope. Android can identify it; native account-key unwrap is the next handoff step."
     "browser_indexeddb_key", "browser_local_storage_key" ->
         "This transcript was saved by a browser device key. Android needs the upcoming cross-device saved-chat key handoff to unlock it."
     "android_other_install" ->

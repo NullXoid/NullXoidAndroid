@@ -163,6 +163,7 @@ private fun ChatRow(chat: ChatRecord, onClick: () -> Unit) {
 }
 
 private fun lockedChatPreview(status: String?): String = when (status) {
+    "account_epoch_wrapped_key" -> "Shared E2EE envelope detected. Native handoff unlock is next."
     "browser_indexeddb_key", "browser_local_storage_key" -> "Locked by a browser device key. Cross-device handoff is pending."
     "android_other_install" -> "Locked by another Android install key."
     "android_local_key" -> "Locked local Android key; refresh or sign in again."

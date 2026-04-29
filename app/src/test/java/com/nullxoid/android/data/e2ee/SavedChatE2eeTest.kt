@@ -92,6 +92,36 @@ class SavedChatE2eeTest {
         assertEquals("browser_indexeddb_key", info.status)
     }
 
+    @Test
+    fun savedChatEnvelopeInspectionClassifiesAccountWrappedKeyAsSharedHandoffTarget() {
+        val envelope = buildJsonObject {
+            put(
+                "saved_chat",
+                buildJsonObject {
+                    put("version", 1)
+                    put("algorithm", "AES-GCM")
+                    put("boundary", "client_or_device")
+                    put("key_envelope", "account_epoch_wrapped_saved_chat_key_v1")
+                    put("key_id", "account-root-key:shared")
+                    put("epoch", 2)
+                    put("aad", "saved_chats_scope_v1")
+                    put("nonce", "AAAAAAAAAAAAAAAA")
+                    put("ciphertext", "ciphertext")
+                    put(
+                        "wrapped_key",
+                        buildJsonObject {
+                            put("plaintext_storage", "forbidden")
+                        }
+                    )
+                }
+            )
+        }
+
+        val info = SavedChatE2ee.inspectEnvelope(envelope, localKeyId = "test-key")
+
+        assertEquals("account_epoch_wrapped_key", info.status)
+    }
+
     private class FakeKeyProvider : SavedChatKeyProvider {
         override fun keyId(tenantId: String, userId: String): String = "test-key"
 
