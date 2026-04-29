@@ -145,6 +145,14 @@ private fun ChatRow(chat: ChatRecord, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2
                 )
+            } else if (chat.e2ee != null && chat.e2eeStatus != "unlocked") {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    lockedChatPreview(chat.e2eeStatus),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2
+                )
             }
             formatMessageTimestamp(chat.updatedAt ?: chat.createdAt)?.let {
                 Spacer(Modifier.height(4.dp))
@@ -152,4 +160,12 @@ private fun ChatRow(chat: ChatRecord, onClick: () -> Unit) {
             }
         }
     }
+}
+
+private fun lockedChatPreview(status: String?): String = when (status) {
+    "browser_indexeddb_key", "browser_local_storage_key" -> "Locked by a browser device key. Cross-device handoff is pending."
+    "android_other_install" -> "Locked by another Android install key."
+    "android_local_key" -> "Locked local Android key; refresh or sign in again."
+    "unsupported_key_envelope", "unsupported_version", "missing_key_envelope" -> "Encrypted with an unsupported saved-chat envelope."
+    else -> "Encrypted chat is locked on this device."
 }

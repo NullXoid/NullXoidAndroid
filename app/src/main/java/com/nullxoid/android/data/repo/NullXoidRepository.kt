@@ -276,7 +276,11 @@ class NullXoidRepository(
     }
 
     private fun decryptChatRecord(auth: AuthState, chat: ChatRecord): ChatRecord {
-        if (!chat.session?.messages.isNullOrEmpty()) return chat
+        val localKeyId = savedChatKeyProvider.keyId(auth.tenantId.orEmpty(), auth.userId.orEmpty())
+        val envelopeInfo = SavedChatE2ee.inspectEnvelope(chat.e2ee, localKeyId)
+        if (!chat.session?.messages.isNullOrEmpty()) {
+            return chat.copy(e2eeStatus = if (chat.e2ee != null) "plaintext_with_e2ee_metadata" else null)
+        }
         val payload = runCatching {
             SavedChatE2ee.decryptPayload(
                 tenantId = auth.tenantId.orEmpty(),
@@ -284,10 +288,11 @@ class NullXoidRepository(
                 e2ee = chat.e2ee,
                 keyProvider = savedChatKeyProvider
             )
-        }.getOrNull() ?: return chat
+        }.getOrNull() ?: return chat.copy(e2eeStatus = envelopeInfo.status)
         return chat.copy(
             title = chat.title.ifBlank { payload.title },
-            session = ChatSession(messages = payload.messages)
+            session = ChatSession(messages = payload.messages),
+            e2eeStatus = "unlocked"
         )
     }
 

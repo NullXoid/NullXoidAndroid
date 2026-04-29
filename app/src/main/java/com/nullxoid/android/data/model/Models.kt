@@ -158,7 +158,8 @@ data class ChatRecord(
     @SerialName("updated_at") val updatedAt: String? = null,
     val archived: Boolean = false,
     val session: ChatSession? = null,
-    val e2ee: JsonObject? = null
+    val e2ee: JsonObject? = null,
+    @SerialName("e2ee_status") val e2eeStatus: String? = null
 )
 
 @Serializable

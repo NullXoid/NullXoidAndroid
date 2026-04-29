@@ -34,6 +34,9 @@ data class EncryptedBytes(
 
 object SavedChatE2ee {
     private const val AAD = "saved_chats_android_v1"
+    private const val ANDROID_KEY_ENVELOPE = "android_keystore_aes_gcm_v1"
+    private const val BROWSER_INDEXEDDB_KEY_ENVELOPE = "device_indexeddb_non_extractable_v1"
+    private const val BROWSER_LOCAL_STORAGE_KEY_ENVELOPE = "device_local_storage_fallback_v1"
 
     private val json = Json {
         encodeDefaults = true
@@ -63,7 +66,7 @@ object SavedChatE2ee {
                     put("algorithm", "AES-GCM-256")
                     put("boundary", "client_or_device")
                     put("key_scope", "android_keystore_non_extractable")
-                    put("key_envelope", "android_keystore_aes_gcm_v1")
+                    put("key_envelope", ANDROID_KEY_ENVELOPE)
                     put("key_storage", "android_keystore")
                     put("key_extractable", "false")
                     put("key_id", keyProvider.keyId(tenantId, userId))
@@ -94,6 +97,29 @@ object SavedChatE2ee {
             encrypted = EncryptedBytes(nonce = nonce, ciphertext = ciphertext)
         )
         return json.decodeFromString<SavedChatPayload>(cleartext.toString(Charsets.UTF_8))
+    }
+
+    fun inspectEnvelope(e2ee: JsonObject?, localKeyId: String?): SavedChatEnvelopeInfo {
+        val savedChat = e2ee?.get("saved_chat")?.jsonObject ?: return SavedChatEnvelopeInfo(status = "none")
+        val version = savedChat["version"]?.jsonPrimitive?.intOrNull ?: 0
+        val keyEnvelope = savedChat["key_envelope"]?.jsonPrimitive?.content.orEmpty()
+        val keyId = savedChat["key_id"]?.jsonPrimitive?.content.orEmpty()
+        val status = when {
+            version != 1 -> "unsupported_version"
+            keyEnvelope == ANDROID_KEY_ENVELOPE && keyId == localKeyId -> "android_local_key"
+            keyEnvelope == ANDROID_KEY_ENVELOPE -> "android_other_install"
+            keyEnvelope == BROWSER_INDEXEDDB_KEY_ENVELOPE -> "browser_indexeddb_key"
+            keyEnvelope == BROWSER_LOCAL_STORAGE_KEY_ENVELOPE -> "browser_local_storage_key"
+            keyEnvelope.isBlank() -> "missing_key_envelope"
+            else -> "unsupported_key_envelope"
+        }
+        return SavedChatEnvelopeInfo(
+            status = status,
+            version = version,
+            keyEnvelope = keyEnvelope,
+            keyId = keyId,
+            aad = savedChat["aad"]?.jsonPrimitive?.content.orEmpty()
+        )
     }
 }
 
@@ -165,6 +191,14 @@ class AndroidSavedChatKeyProvider : SavedChatKeyProvider {
 data class SavedChatPayload(
     val title: String,
     val messages: List<ChatMessage>
+)
+
+data class SavedChatEnvelopeInfo(
+    val status: String,
+    val version: Int = 0,
+    val keyEnvelope: String = "",
+    val keyId: String = "",
+    val aad: String = ""
 )
 
 private fun ByteArray.base64(): String =

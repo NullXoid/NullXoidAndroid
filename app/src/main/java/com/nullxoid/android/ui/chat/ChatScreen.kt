@@ -211,7 +211,7 @@ fun ChatScreen(
                         Text("Encrypted chat from another key.", style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "This transcript exists on the backend, but this Android install cannot decrypt it yet. Cross-device key handoff is still on the E2EE roadmap.",
+                            lockedChatDetail(state.activeChat?.e2eeStatus),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -297,6 +297,19 @@ fun ChatScreen(
 
 private fun streamingAssistantText(state: AppUiState): String {
     return state.streamBuffer.ifBlank { "Thinking..." }
+}
+
+private fun lockedChatDetail(status: String?): String = when (status) {
+    "browser_indexeddb_key", "browser_local_storage_key" ->
+        "This transcript was saved by a browser device key. Android needs the upcoming cross-device saved-chat key handoff to unlock it."
+    "android_other_install" ->
+        "This transcript was saved by a different Android install key. Device recovery/handoff is required before this install can decrypt it."
+    "android_local_key" ->
+        "This transcript matches the local Android key metadata but decryption failed. Refresh, sign in again, or keep this chat for diagnostics."
+    "unsupported_key_envelope", "unsupported_version", "missing_key_envelope" ->
+        "This transcript uses an unsupported E2EE envelope. The server still stores only ciphertext."
+    else ->
+        "This transcript exists on the backend, but this Android install cannot decrypt it yet. Cross-device key handoff is still on the E2EE roadmap."
 }
 
 private fun streamingAssistantCreatedAt(state: AppUiState): String? {
