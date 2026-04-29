@@ -60,8 +60,13 @@ fun ChatScreen(
 
     val renderedList = buildList {
         addAll(state.activeMessages)
-        if (state.streaming && state.streamBuffer.isNotEmpty()) {
-            add(ChatMessage(role = "assistant", content = state.streamBuffer))
+        if (state.streaming) {
+            add(
+                ChatMessage(
+                    role = "assistant",
+                    content = streamingAssistantText(state)
+                )
+            )
         }
     }
 
@@ -79,6 +84,13 @@ fun ChatScreen(
                         Text(state.activeChat?.title ?: "New chat")
                         state.selectedModel?.let {
                             Text(it, style = MaterialTheme.typography.labelSmall)
+                        }
+                        if (state.streaming) {
+                            Text(
+                                streamMetricLabel(state),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 },
@@ -176,6 +188,19 @@ fun ChatScreen(
             }
         }
     }
+}
+
+private fun streamingAssistantText(state: AppUiState): String {
+    val text = state.streamBuffer.ifBlank { "Thinking..." }
+    return "$text\n\n${streamMetricLabel(state)}"
+}
+
+private fun streamMetricLabel(state: AppUiState): String {
+    val status = state.streamStatus.ifBlank {
+        if (state.streamBuffer.isBlank()) "Thinking" else "Streaming"
+    }
+    val speed = String.format(java.util.Locale.US, "%.1f", state.streamTokensPerSecond)
+    return "$status | tokens ~${state.streamApproxTokens} | $speed tok/s"
 }
 
 @Composable

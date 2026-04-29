@@ -36,6 +36,9 @@ import kotlinx.coroutines.launch
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
 private const val OIDC_REDIRECT_URI = "nullxoid://auth/oidc/callback"
 
+internal fun estimateStreamTokens(text: String): Int =
+    if (text.isBlank()) 0 else maxOf(1, (text.length + 3) / 4)
+
 internal fun mobilePasskeySignInError(t: Throwable): String {
     val details = listOfNotNull(t.message, t::class.simpleName).joinToString(" ").lowercase()
     return when {
@@ -92,6 +95,10 @@ data class AppUiState(
     val activeMessages: List<ChatMessage> = emptyList(),
     val streaming: Boolean = false,
     val streamBuffer: String = "",
+    val streamStartedAtMs: Long = 0L,
+    val streamApproxTokens: Int = 0,
+    val streamTokensPerSecond: Double = 0.0,
+    val streamStatus: String = "",
     val health: HealthFeatures? = null,
     val embeddedEnabled: Boolean = false,
     val embeddedEngine: String = SettingsStore.EMBEDDED_ENGINE_ECHO,
@@ -461,10 +468,15 @@ class NullXoidViewModel(
             activeMessages = nextHistory,
             streaming = true,
             streamBuffer = "",
+            streamStartedAtMs = System.currentTimeMillis(),
+            streamApproxTokens = 0,
+            streamTokensPerSecond = 0.0,
+            streamStatus = "Thinking",
             error = null
         )
         streamJob = viewModelScope.launch {
             val acc = StringBuilder()
+            val startedAtMs = _state.value.streamStartedAtMs
             var streamFailed = false
             var createdChatId: String? = null
             runCatching {
@@ -491,7 +503,18 @@ class NullXoidViewModel(
                     when (evt) {
                         is StreamEvent.Delta -> {
                             acc.append(evt.text)
-                            _state.value = _state.value.copy(streamBuffer = acc.toString())
+                            val tokenCount = _state.value.streamApproxTokens +
+                                estimateStreamTokens(evt.text)
+                            val elapsedSeconds = maxOf(
+                                0.25,
+                                (System.currentTimeMillis() - startedAtMs) / 1000.0
+                            )
+                            _state.value = _state.value.copy(
+                                streamBuffer = acc.toString(),
+                                streamApproxTokens = tokenCount,
+                                streamTokensPerSecond = tokenCount / elapsedSeconds,
+                                streamStatus = "Streaming"
+                            )
                         }
                         is StreamEvent.Error -> {
                             streamFailed = true
@@ -522,7 +545,9 @@ class NullXoidViewModel(
                                 activeChat = _state.value.activeChat?.copy(
                                     session = ChatSession(messages = updated)
                                 ),
-                                streamBuffer = ""
+                                streamBuffer = "",
+                                streamStartedAtMs = 0L,
+                                streamStatus = ""
                             )
                             refreshChats()
                         }
@@ -560,13 +585,21 @@ class NullXoidViewModel(
             },
             streaming = false,
             streamBuffer = "",
+            streamStartedAtMs = 0L,
+            streamApproxTokens = 0,
+            streamTokensPerSecond = 0.0,
+            streamStatus = "",
             error = error
         )
     }
 
     fun cancelStream() {
         streamJob?.cancel()
-        _state.value = _state.value.copy(streaming = false)
+        _state.value = _state.value.copy(
+            streaming = false,
+            streamStartedAtMs = 0L,
+            streamStatus = ""
+        )
     }
 
     fun clearError() {
