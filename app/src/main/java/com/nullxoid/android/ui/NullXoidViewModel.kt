@@ -441,13 +441,13 @@ class NullXoidViewModel(
                 val chat = active ?: run {
                     val created = repo.createChat(
                         title = trimmed.take(60),
-                        messages = nextHistory
+                        messages = emptyList()
                     )
                     _state.value = _state.value.copy(
-                        activeChat = created,
+                        activeChat = created.copy(session = ChatSession(messages = nextHistory)),
                         chats = listOf(created) + _state.value.chats.filterNot { it.id == created.id }
                     )
-                    created
+                    created.copy(session = ChatSession(messages = nextHistory))
                 }
                 repo.streamReply(
                     model = model,
