@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,10 +20,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
@@ -47,7 +50,10 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.model.ChatMessage
 import com.nullxoid.android.ui.AppUiState
@@ -66,7 +72,9 @@ fun ChatScreen(
     onOpenSettings: () -> Unit
 ) {
     var draft by remember { mutableStateOf("") }
+    var selectedMessage by remember { mutableStateOf<ChatMessage?>(null) }
     val listState = rememberLazyListState()
+    val clipboard = LocalClipboardManager.current
     fun sendDraft() {
         val text = draft
         if (text.isBlank() || state.streaming) return
@@ -230,10 +238,35 @@ fun ChatScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(renderedList) { msg -> MessageBubble(msg) }
+                    items(renderedList) { msg ->
+                        MessageBubble(
+                            msg = msg,
+                            onClick = { selectedMessage = msg }
+                        )
+                    }
                 }
             }
         }
+    }
+
+    selectedMessage?.let { msg ->
+        MessageDetailsSheet(
+            msg = msg,
+            metric = if (
+                !state.streaming &&
+                msg.role.equals("assistant", ignoreCase = true) &&
+                msg == state.activeMessages.lastOrNull()
+            ) {
+                state.lastStreamMetric
+            } else {
+                ""
+            },
+            onDismiss = { selectedMessage = null },
+            onCopy = {
+                clipboard.setText(AnnotatedString(msg.content))
+                selectedMessage = null
+            }
+        )
     }
 }
 
@@ -253,7 +286,10 @@ private fun streamMetricLabel(state: AppUiState): String {
 }
 
 @Composable
-private fun MessageBubble(msg: ChatMessage) {
+private fun MessageBubble(
+    msg: ChatMessage,
+    onClick: () -> Unit
+) {
     val isUser = msg.role.equals("user", ignoreCase = true)
     val bg = if (isUser) MaterialTheme.colorScheme.primary
              else MaterialTheme.colorScheme.surfaceVariant
@@ -266,7 +302,8 @@ private fun MessageBubble(msg: ChatMessage) {
         Surface(
             color = bg,
             shape = RoundedCornerShape(16.dp),
-            tonalElevation = 0.dp
+            tonalElevation = 0.dp,
+            modifier = Modifier.clickable(onClick = onClick)
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Text(
@@ -280,6 +317,46 @@ private fun MessageBubble(msg: ChatMessage) {
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MessageDetailsSheet(
+    msg: ChatMessage,
+    metric: String,
+    onDismiss: () -> Unit,
+    onCopy: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Message", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "${msg.role.lowercase()} | ${msg.content.length} chars | tokens ~${estimateMessageTokens(msg.content)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (metric.isNotBlank()) {
+                Text(
+                    metric,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onCopy) { Text("Copy") }
+                Spacer(Modifier.width(4.dp))
+                AssistChip(onClick = onDismiss, label = { Text("Close") })
+            }
+        }
+    }
+}
+
+private fun estimateMessageTokens(text: String): Int =
+    if (text.isBlank()) 0 else maxOf(1, (text.length + 3) / 4)
 
 @Suppress("unused")
 private val DebugTransparent = Color.Transparent

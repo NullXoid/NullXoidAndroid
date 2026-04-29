@@ -18,4 +18,12 @@ class StreamMetricsTest {
             formatStreamMetric(status = "Done", tokens = 12, tokensPerSecond = 3.456)
         )
     }
+
+    @Test
+    fun normalizesBackendStreamStatus() {
+        assertEquals("Thinking", streamStatusLabel("started"))
+        assertEquals("Queued", streamStatusLabel("pending"))
+        assertEquals("Streaming", streamStatusLabel("running"))
+        assertEquals("Done", streamStatusLabel("completed"))
+    }
 }

@@ -48,6 +48,15 @@ internal fun formatStreamMetric(
     return "$status | tokens ~$tokens | $speed tok/s"
 }
 
+internal fun streamStatusLabel(status: String): String =
+    when (status.trim().lowercase()) {
+        "", "started", "start" -> "Thinking"
+        "queued", "pending" -> "Queued"
+        "running", "streaming", "token" -> "Streaming"
+        "completed", "done", "complete" -> "Done"
+        else -> status.replaceFirstChar { it.uppercase() }
+    }
+
 internal fun mobilePasskeySignInError(t: Throwable): String {
     val details = listOfNotNull(t.message, t::class.simpleName).joinToString(" ").lowercase()
     return when {
@@ -544,6 +553,11 @@ class NullXoidViewModel(
                                 createdChatId = createdChatId,
                                 failedPrompt = trimmed,
                                 error = evt.message
+                            )
+                        }
+                        is StreamEvent.Job -> {
+                            _state.value = _state.value.copy(
+                                streamStatus = streamStatusLabel(evt.status)
                             )
                         }
                         StreamEvent.Completed -> {
