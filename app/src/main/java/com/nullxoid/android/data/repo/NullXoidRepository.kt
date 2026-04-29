@@ -192,10 +192,25 @@ class NullXoidRepository(
                     workspaceId = context.workspaceId,
                     projectId = context.projectId,
                     tenantId = auth.tenantId,
-                    userId = auth.userId
+                    userId = auth.userId,
+                    providerThinking = providerThinkingFor(model)
                 )
             )
         )
+    }
+
+    private fun providerThinkingFor(model: String): Boolean? {
+        val normalized = model.lowercase()
+        return if (
+            normalized.contains("qwen") ||
+            normalized.contains("deepseek") ||
+            normalized.contains("reasoning") ||
+            normalized.contains("r1")
+        ) {
+            true
+        } else {
+            null
+        }
     }
 
     suspend fun selectedModel(): String? = settingsStore.selectedModel.first()

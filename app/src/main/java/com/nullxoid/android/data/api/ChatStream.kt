@@ -125,6 +125,11 @@ class ChatStream(
                     ?: payload
                 StreamEvent.Delta(text)
             }
+            "thinking", "reasoning" -> {
+                val tokens = obj?.get("tokens")?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull()
+                    ?: 0
+                StreamEvent.Thinking(tokens)
+            }
             "job" -> {
                 val id = obj?.get("id")?.jsonPrimitive?.contentOrNullSafe().orEmpty()
                 val status = obj?.get("status")?.jsonPrimitive?.contentOrNullSafe().orEmpty()

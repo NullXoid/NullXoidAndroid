@@ -545,6 +545,18 @@ class NullXoidViewModel(
                                 streamStatus = "Streaming"
                             )
                         }
+                        is StreamEvent.Thinking -> {
+                            val tokenCount = maxOf(_state.value.streamApproxTokens, evt.tokens)
+                            val elapsedSeconds = maxOf(
+                                0.25,
+                                (System.currentTimeMillis() - startedAtMs) / 1000.0
+                            )
+                            _state.value = _state.value.copy(
+                                streamApproxTokens = tokenCount,
+                                streamTokensPerSecond = tokenCount / elapsedSeconds,
+                                streamStatus = "Thinking"
+                            )
+                        }
                         is StreamEvent.Error -> {
                             streamFailed = true
                             restoreFailedSend(

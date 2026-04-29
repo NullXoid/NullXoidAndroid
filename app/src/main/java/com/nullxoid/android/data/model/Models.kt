@@ -250,6 +250,7 @@ data class ChatStreamRequest(
     @SerialName("project_id") val projectId: String? = null,
     @SerialName("tenant_id") val tenantId: String? = null,
     @SerialName("user_id") val userId: String? = null,
+    @SerialName("provider_thinking") val providerThinking: Boolean? = null,
     @SerialName("stream_live") val streamLive: Boolean = true,
     val stream: Boolean = true,
     val parameters: JsonObject? = null
@@ -261,6 +262,7 @@ data class ChatStreamRequest(
  */
 sealed class StreamEvent {
     data class Delta(val text: String) : StreamEvent()
+    data class Thinking(val tokens: Int) : StreamEvent()
     data class Job(val id: String, val status: String, val raw: JsonElement) : StreamEvent()
     data class Meta(val raw: JsonElement) : StreamEvent()
     data object Completed : StreamEvent()

@@ -20,4 +20,17 @@ class ChatStreamParserTest {
         assertTrue(event is StreamEvent.Delta)
         assertEquals("Hello from hosted NullXoid", (event as StreamEvent.Delta).text)
     }
+
+    @Test
+    fun parsesThinkingFramesAsStatusOnlyEvents() {
+        val event = stream.parseFrame(
+            """
+            event: thinking
+            data: {"type":"thinking","tokens":24}
+            """.trimIndent()
+        )
+
+        assertTrue(event is StreamEvent.Thinking)
+        assertEquals(24, (event as StreamEvent.Thinking).tokens)
+    }
 }
