@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.ui.AppUiState
@@ -60,11 +61,14 @@ fun SettingsScreen(
     onRefreshPasskeys: () -> Unit,
     onRegisterPasskey: () -> Unit,
     onRevokePasskey: (String) -> Unit,
+    onImportSavedChatRecovery: (String, String) -> Unit,
     onRunOnboarding: () -> Unit
 ) {
     var urlDraft by remember(state.backendUrl) { mutableStateOf(state.backendUrl) }
     var providerUrlDraft by remember(state.ollamaUrl) { mutableStateOf(state.ollamaUrl) }
     var providerModelDraft by remember(state.ollamaModel) { mutableStateOf(state.ollamaModel) }
+    var recoverySecretDraft by remember { mutableStateOf("") }
+    var recoveryEnvelopeDraft by remember { mutableStateOf("") }
     val selectedProviderName = when (state.embeddedEngine) {
         SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP -> "llama.cpp"
         SettingsStore.EMBEDDED_ENGINE_OLLAMA -> "Ollama"
@@ -223,6 +227,46 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.height(4.dp))
                 }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Saved-chat recovery", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Import the web recovery secret and envelope to unlock shared encrypted chats on this phone.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = recoverySecretDraft,
+                onValueChange = { recoverySecretDraft = it },
+                label = { Text("Recovery secret") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings-recovery-secret")
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = recoveryEnvelopeDraft,
+                onValueChange = { recoveryEnvelopeDraft = it },
+                label = { Text("Recovery envelope JSON") },
+                minLines = 3,
+                maxLines = 5,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings-recovery-envelope")
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                modifier = Modifier.testTag("settings-recovery-import"),
+                enabled = state.auth.authenticated &&
+                    recoverySecretDraft.isNotBlank() &&
+                    recoveryEnvelopeDraft.isNotBlank() &&
+                    !state.passkeyLoading,
+                onClick = { onImportSavedChatRecovery(recoverySecretDraft, recoveryEnvelopeDraft) }
+            ) {
+                Text(if (state.passkeyLoading) "Importing" else "Import E2EE key")
             }
 
             Spacer(Modifier.height(24.dp))

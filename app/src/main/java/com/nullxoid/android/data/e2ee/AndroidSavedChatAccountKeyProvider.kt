@@ -16,7 +16,7 @@ import javax.crypto.spec.GCMParameterSpec
  * Android Keystore key. This is the native side of the zero-knowledge handoff:
  * the backend still only sees encrypted saved-chat envelopes.
  */
-class AndroidSavedChatAccountKeyProvider(context: Context) : SavedChatAccountKeyProvider {
+class AndroidSavedChatAccountKeyProvider(context: Context) : SavedChatAccountKeyStore {
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -32,7 +32,7 @@ class AndroidSavedChatAccountKeyProvider(context: Context) : SavedChatAccountKey
         }.getOrNull()?.takeIf { it.size == ACCOUNT_KEY_BYTES }
     }
 
-    fun storeAccountKey(tenantId: String, userId: String, epoch: Int, accountKey: ByteArray) {
+    override fun storeAccountKey(tenantId: String, userId: String, epoch: Int, accountKey: ByteArray) {
         require(accountKey.size == ACCOUNT_KEY_BYTES) { "Account epoch key must be 32 bytes." }
         val storageKey = storageKey(tenantId, userId, epoch)
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -45,7 +45,7 @@ class AndroidSavedChatAccountKeyProvider(context: Context) : SavedChatAccountKey
             .apply()
     }
 
-    fun hasAccountKey(tenantId: String, userId: String, epoch: Int): Boolean =
+    override fun hasAccountKey(tenantId: String, userId: String, epoch: Int): Boolean =
         accountKey(tenantId, userId, epoch) != null
 
     fun removeAccountKey(tenantId: String, userId: String, epoch: Int) {

@@ -33,6 +33,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import java.time.Instant
 
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
@@ -154,6 +156,7 @@ class NullXoidViewModel(
     private var streamJob: Job? = null
     private var updateCheckJob: Job? = null
     private var pendingOidcLaunch: OidcLaunch? = null
+    private val importJson = Json { ignoreUnknownKeys = true }
 
     fun bootstrap() {
         viewModelScope.launch {
@@ -473,6 +476,43 @@ class NullXoidViewModel(
                     _state.value = _state.value.copy(
                         passkeyLoading = false,
                         error = t.message ?: "Could not remove passkey"
+                    )
+                }
+        }
+    }
+
+    fun importSavedChatRecovery(recoverySecret: String, recoveryBundleJson: String) {
+        if (!_state.value.auth.authenticated) {
+            _state.value = _state.value.copy(
+                error = "Sign in before importing a saved-chat recovery key.",
+                notice = null
+            )
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(passkeyLoading = true, error = null, notice = null)
+            runCatching {
+                val bundle = importJson.parseToJsonElement(recoveryBundleJson.trim()).jsonObject
+                repo.importSavedChatRecoveryEnvelope(recoverySecret.trim(), bundle)
+            }
+                .onSuccess { epoch ->
+                    val chats = runCatching { repo.chats() }.getOrDefault(_state.value.chats)
+                    val activeId = _state.value.activeChat?.id
+                    val refreshedActive = activeId?.let { id -> chats.firstOrNull { it.id == id } }
+                    _state.value = _state.value.copy(
+                        passkeyLoading = false,
+                        chats = chats,
+                        activeChat = refreshedActive ?: _state.value.activeChat,
+                        activeMessages = refreshedActive?.session?.messages ?: _state.value.activeMessages,
+                        notice = "Saved-chat recovery key imported for epoch $epoch.",
+                        error = null
+                    )
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        passkeyLoading = false,
+                        error = t.message ?: "Saved-chat recovery import failed.",
+                        notice = null
                     )
                 }
         }

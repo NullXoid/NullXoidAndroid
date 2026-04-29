@@ -8,6 +8,7 @@ import com.nullxoid.android.data.auth.NativeAuthCoordinator
 import com.nullxoid.android.data.auth.OidcLaunch
 import com.nullxoid.android.data.e2ee.AndroidSavedChatKeyProvider
 import com.nullxoid.android.data.e2ee.SavedChatAccountKeyProvider
+import com.nullxoid.android.data.e2ee.SavedChatAccountKeyStore
 import com.nullxoid.android.data.e2ee.SavedChatE2ee
 import com.nullxoid.android.data.e2ee.SavedChatKeyProvider
 import com.nullxoid.android.data.model.AuthState
@@ -32,6 +33,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Single place the UI goes through. Same role as the desktop Controller
@@ -216,6 +221,32 @@ class NullXoidRepository(
     suspend fun health(): HealthFeatures = api.healthFeatures()
 
     suspend fun clientManifest(): ClientManifest = api.clientManifest("android")
+
+    suspend fun importSavedChatRecoveryEnvelope(recoverySecret: String, recoveryBundle: JsonObject): Int {
+        val auth = requireScopedAuth()
+        val keyStore = savedChatAccountKeyProvider as? SavedChatAccountKeyStore
+            ?: error("Native saved-chat key storage is unavailable.")
+        val envelope = recoveryBundle["recovery_envelope"]?.jsonObject ?: recoveryBundle
+        val epoch = recoveryBundle["epoch"]?.jsonPrimitive?.intOrNull
+            ?: envelope["epoch"]?.jsonPrimitive?.intOrNull
+            ?: 1
+        val accountKey = SavedChatE2ee.recoverAccountKeyFromRecoveryEnvelope(
+            tenantId = auth.tenantId.orEmpty(),
+            userId = auth.userId.orEmpty(),
+            recoverySecret = recoverySecret,
+            recoveryEnvelope = envelope
+        )
+        keyStore.storeAccountKey(
+            tenantId = auth.tenantId.orEmpty(),
+            userId = auth.userId.orEmpty(),
+            epoch = epoch,
+            accountKey = accountKey
+        )
+        check(keyStore.hasAccountKey(auth.tenantId.orEmpty(), auth.userId.orEmpty(), epoch)) {
+            "Recovered key could not be verified after local storage."
+        }
+        return epoch
+    }
 
     fun streamReply(
         model: String,

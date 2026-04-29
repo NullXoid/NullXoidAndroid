@@ -159,6 +159,7 @@ fun NullXoidApp(
                         onRefreshPasskeys = vm::refreshPasskeys,
                         onRegisterPasskey = { vm.registerPasskey(context) },
                         onRevokePasskey = vm::revokePasskey,
+                        onImportSavedChatRecovery = vm::importSavedChatRecovery,
                         onRunOnboarding = {
                             vm.resetOnboarding()
                             nav.navigate(Routes.Onboarding)

@@ -3,12 +3,15 @@ package com.nullxoid.android.data.e2ee
 import com.nullxoid.android.data.model.ChatMessage
 import java.util.Base64
 import javax.crypto.Cipher
+import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -248,6 +251,41 @@ class SavedChatE2eeTest {
         assertEquals("account_epoch_wrapped_key", SavedChatE2ee.inspectEnvelope(envelope, localKeyId = null).status)
     }
 
+    @Test
+    fun recoveryEnvelopeRestoresAccountEpochKey() {
+        val tenantId = "default"
+        val userId = "shared-user"
+        val recoverySecret = "correct horse battery staple"
+        val accountKey = ByteArray(32) { (it + 5).toByte() }
+        val salt = ByteArray(16) { (it + 17).toByte() }
+        val recoveryKey = deriveRecoveryKey(recoverySecret, salt)
+        val encrypted = encryptAesGcm(
+            key = recoveryKey,
+            nonce = ByteArray(12) { (it + 29).toByte() },
+            aad = SavedChatE2ee.recoveryAad(tenantId, userId),
+            plaintext = accountKey
+        )
+        val recoveryEnvelope = buildJsonObject {
+            put("version", 1)
+            put("algorithm", "AES-GCM-256")
+            put("kdf", "PBKDF2-SHA256")
+            put("iterations", 210_000)
+            put("plaintext_storage", "forbidden")
+            put("salt", salt.base64Url())
+            put("nonce", encrypted.nonce.base64Url())
+            put("ciphertext", encrypted.ciphertext.base64Url())
+        }
+
+        val recovered = SavedChatE2ee.recoverAccountKeyFromRecoveryEnvelope(
+            tenantId = tenantId,
+            userId = userId,
+            recoverySecret = recoverySecret,
+            recoveryEnvelope = recoveryEnvelope
+        )
+
+        assertArrayEquals(accountKey, recovered)
+    }
+
     private class FakeKeyProvider : SavedChatKeyProvider {
         override fun keyId(tenantId: String, userId: String): String = "test-key"
 
@@ -287,6 +325,23 @@ class SavedChatE2eeTest {
         cipher.updateAAD(aad.toByteArray(Charsets.UTF_8))
         return TestEncrypted(nonce = nonce, ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8)))
     }
+
+    private fun encryptAesGcm(
+        key: ByteArray,
+        nonce: ByteArray,
+        aad: String,
+        plaintext: ByteArray
+    ): TestEncrypted {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))
+        cipher.updateAAD(aad.toByteArray(Charsets.UTF_8))
+        return TestEncrypted(nonce = nonce, ciphertext = cipher.doFinal(plaintext))
+    }
+
+    private fun deriveRecoveryKey(recoverySecret: String, salt: ByteArray): ByteArray =
+        SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+            .generateSecret(PBEKeySpec(recoverySecret.toCharArray(), salt, 210_000, 256))
+            .encoded
 
     private fun ByteArray.base64Url(): String =
         Base64.getUrlEncoder().withoutPadding().encodeToString(this)
