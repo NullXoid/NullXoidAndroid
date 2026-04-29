@@ -245,6 +245,16 @@ data class ClientManifestBilling(
 )
 
 @Serializable
+data class ClientManifestE2ee(
+    val status: String = "unknown",
+    val summary: String? = null,
+    @SerialName("client_side") val clientSide: JsonObject? = null,
+    @SerialName("server_at_rest") val serverAtRest: JsonObject? = null,
+    @SerialName("not_e2ee") val notE2ee: JsonObject? = null,
+    val next: List<String> = emptyList()
+)
+
+@Serializable
 data class ClientManifest(
     val ok: Boolean = true,
     @SerialName("schema_version") val schemaVersion: Int = 0,
@@ -252,6 +262,7 @@ data class ClientManifest(
     val features: JsonObject? = null,
     val menus: List<JsonObject> = emptyList(),
     val updates: ClientManifestUpdates? = null,
+    val e2ee: ClientManifestE2ee? = null,
     val billing: ClientManifestBilling? = null
 )
 

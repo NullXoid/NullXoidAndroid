@@ -19,6 +19,11 @@ class ClientManifestUiTest {
             {
               "schema_version": 1,
               "platform": "android",
+              "e2ee": {
+                "status": "partial",
+                "summary": "Saved data paths are encrypted.",
+                "next": ["Android saved-chat client envelope"]
+              },
               "updates": {
                 "channels": ["auto", "forgejo"],
                 "recommended_channel": "auto"
@@ -26,6 +31,9 @@ class ClientManifestUiTest {
             }
             """.trimIndent()
         )
+
+        assertEquals("partial", manifest.e2ee?.status)
+        assertEquals(listOf("Android saved-chat client envelope"), manifest.e2ee?.next)
         val state = AppUiState(
             updateSource = SettingsStore.UPDATE_SOURCE_GITHUB,
             clientManifest = manifest
@@ -46,4 +54,3 @@ class ClientManifestUiTest {
         assertEquals(SettingsStore.UPDATE_SOURCE_FORGEJO, updateSourceAllowedByManifest(state))
     }
 }
-
