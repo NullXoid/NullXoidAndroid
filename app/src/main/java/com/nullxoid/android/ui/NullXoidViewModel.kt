@@ -428,7 +428,9 @@ class NullXoidViewModel(
             return
         }
         val userMsg = ChatMessage(role = "user", content = trimmed)
-        val nextHistory = _state.value.activeMessages + userMsg
+        val previousHistory = _state.value.activeMessages
+        val previousChat = _state.value.activeChat
+        val nextHistory = previousHistory + userMsg
         _state.value = _state.value.copy(
             activeMessages = nextHistory,
             streaming = true,
@@ -438,6 +440,7 @@ class NullXoidViewModel(
         streamJob = viewModelScope.launch {
             val acc = StringBuilder()
             var streamFailed = false
+            var createdChatId: String? = null
             runCatching {
                 val active = _state.value.activeChat
                 val chat = active ?: run {
@@ -445,6 +448,7 @@ class NullXoidViewModel(
                         title = trimmed.take(60),
                         messages = emptyList()
                     )
+                    createdChatId = created.id
                     _state.value = _state.value.copy(
                         activeChat = created.copy(session = ChatSession(messages = nextHistory)),
                         chats = listOf(created) + _state.value.chats.filterNot { it.id == created.id }
@@ -465,8 +469,10 @@ class NullXoidViewModel(
                         }
                         is StreamEvent.Error -> {
                             streamFailed = true
-                            _state.value = _state.value.copy(
-                                streaming = false,
+                            restoreFailedSend(
+                                previousHistory = previousHistory,
+                                previousChat = previousChat,
+                                createdChatId = createdChatId,
                                 error = evt.message
                             )
                         }
@@ -474,9 +480,11 @@ class NullXoidViewModel(
                             if (streamFailed) return@collect
                             val finalText = acc.toString()
                             if (finalText.isBlank()) {
-                                _state.value = _state.value.copy(
-                                    streaming = false,
-                                    streamBuffer = ""
+                                restoreFailedSend(
+                                    previousHistory = previousHistory,
+                                    previousChat = previousChat,
+                                    createdChatId = createdChatId,
+                                    error = "No assistant response was received from the backend."
                                 )
                                 return@collect
                             }
@@ -499,10 +507,35 @@ class NullXoidViewModel(
                 if (t is CancellationException) {
                     _state.value = _state.value.copy(streaming = false, streamBuffer = "")
                 } else {
-                    _state.value = _state.value.copy(streaming = false, error = t.message)
+                    restoreFailedSend(
+                        previousHistory = previousHistory,
+                        previousChat = previousChat,
+                        createdChatId = createdChatId,
+                        error = t.message ?: "Message failed"
+                    )
                 }
             }
         }
+    }
+
+    private fun restoreFailedSend(
+        previousHistory: List<ChatMessage>,
+        previousChat: ChatRecord?,
+        createdChatId: String?,
+        error: String
+    ) {
+        _state.value = _state.value.copy(
+            activeMessages = previousHistory,
+            activeChat = previousChat,
+            chats = if (createdChatId == null) {
+                _state.value.chats
+            } else {
+                _state.value.chats.filterNot { it.id == createdChatId }
+            },
+            streaming = false,
+            streamBuffer = "",
+            error = error
+        )
     }
 
     fun cancelStream() {

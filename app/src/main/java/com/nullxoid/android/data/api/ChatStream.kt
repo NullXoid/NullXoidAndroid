@@ -23,7 +23,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * decoded into a specific event variant based on its `event:` field.
  *
  * Event contract (from the desktop consumer):
- *   - `delta`       — incremental assistant text at `data.text` or `data.delta`
+ *   - `delta/token` — incremental assistant text at `data.text` or `data.delta`
  *   - `job`         — job lifecycle; raw JSON is surfaced as-is
  *   - `nullxoid`    — controller metadata (policy_rationale etc)
  *   - `completed`   — end of stream
@@ -94,7 +94,7 @@ class ChatStream(
         awaitClose { call.cancel() }
     }.flowOn(Dispatchers.IO)
 
-    private fun parseFrame(frame: String): StreamEvent? {
+    internal fun parseFrame(frame: String): StreamEvent? {
         var eventName = "delta"
         val dataBuf = StringBuilder()
         frame.lineSequence().forEach { raw ->
@@ -114,7 +114,7 @@ class ChatStream(
         val obj: JsonObject? = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull()
 
         return when (eventName.lowercase()) {
-            "delta", "message", "chunk" -> {
+            "delta", "message", "chunk", "token" -> {
                 val text = obj?.get("text")?.jsonPrimitive?.contentOrNullSafe()
                     ?: obj?.get("delta")?.jsonPrimitive?.contentOrNullSafe()
                     ?: obj?.get("content")?.jsonPrimitive?.contentOrNullSafe()
