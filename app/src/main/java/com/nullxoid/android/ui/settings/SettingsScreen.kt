@@ -1,5 +1,6 @@
 package com.nullxoid.android.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -42,6 +44,8 @@ import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.ui.AppUiState
 import com.nullxoid.android.ui.availableUpdateSources
 import com.nullxoid.android.ui.passkeyEnrollmentStatusText
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,11 +68,18 @@ fun SettingsScreen(
     onImportSavedChatRecovery: (String, String) -> Unit,
     onRunOnboarding: () -> Unit
 ) {
+    val clipboard = LocalClipboardManager.current
     var urlDraft by remember(state.backendUrl) { mutableStateOf(state.backendUrl) }
     var providerUrlDraft by remember(state.ollamaUrl) { mutableStateOf(state.ollamaUrl) }
     var providerModelDraft by remember(state.ollamaModel) { mutableStateOf(state.ollamaModel) }
     var recoverySecretDraft by remember { mutableStateOf("") }
     var recoveryEnvelopeDraft by remember { mutableStateOf("") }
+    val qrScanner = rememberLauncherForActivityResult(ScanContract()) { result ->
+        result.contents?.trim()?.takeIf { it.isNotBlank() }?.let { scanned ->
+            recoveryEnvelopeDraft = scanned
+            recoverySecretDraft = ""
+        }
+    }
     val selectedProviderName = when (state.embeddedEngine) {
         SettingsStore.EMBEDDED_ENGINE_LLAMA_CPP -> "llama.cpp"
         SettingsStore.EMBEDDED_ENGINE_OLLAMA -> "Ollama"
@@ -232,9 +243,46 @@ fun SettingsScreen(
             Text("Saved-chat recovery", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             Text(
-                "If you do not remember a recovery secret, use the web app: Settings > Privacy/Security > Reset browser device setup, then Copy Android import kit. Paste that full JSON below and leave the optional secret field blank. The fresh JSON says \"kit_type\":\"one_paste_android_import\".",
+                "If you do not remember a recovery secret, use the web app: Settings > Privacy/Security > Reset browser device setup, then Copy Android import kit. Scan the QR or paste the full JSON below and leave the optional secret field blank. The fresh JSON says \"kit_type\":\"one_paste_android_import\".",
                 style = MaterialTheme.typography.bodySmall
             )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("settings-recovery-scan-qr"),
+                    enabled = !state.passkeyLoading,
+                    onClick = {
+                        qrScanner.launch(
+                            ScanOptions()
+                                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                .setPrompt("Scan NullXoid Android import kit")
+                                .setBeepEnabled(false)
+                                .setOrientationLocked(false)
+                        )
+                    }
+                ) {
+                    Text("Scan QR")
+                }
+                OutlinedButton(
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("settings-recovery-paste-clipboard"),
+                    enabled = !state.passkeyLoading,
+                    onClick = {
+                        clipboard.getText()?.text?.trim()?.takeIf { it.isNotBlank() }?.let { copied ->
+                            recoveryEnvelopeDraft = copied
+                            recoverySecretDraft = ""
+                        }
+                    }
+                ) {
+                    Text("Paste clipboard")
+                }
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = recoverySecretDraft,
