@@ -457,10 +457,10 @@ private fun canonicalJson(value: Any?): String = when (value) {
     is Map<*, *> -> value.keys
         .map { it.toString() }
         .sorted()
-        .joinToString(prefix = "{", postfix = "}") { key ->
+        .joinToString(separator = ",", prefix = "{", postfix = "}") { key ->
             "${Json.encodeToString(key)}:${canonicalJson(value[key])}"
         }
-    is List<*> -> value.joinToString(prefix = "[", postfix = "]") { canonicalJson(it) }
+    is List<*> -> value.joinToString(separator = ",", prefix = "[", postfix = "]") { canonicalJson(it) }
     is JsonElement -> value.toString()
     else -> Json.encodeToString(value.toString())
 }
