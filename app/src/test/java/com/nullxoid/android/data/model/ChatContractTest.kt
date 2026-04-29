@@ -1,7 +1,12 @@
 package com.nullxoid.android.data.model
 
+import com.nullxoid.android.data.e2ee.EncryptedBytes
+import com.nullxoid.android.data.e2ee.SavedChatE2ee
+import com.nullxoid.android.data.e2ee.SavedChatKeyProvider
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatContractTest {
@@ -54,5 +59,55 @@ class ChatContractTest {
         assertEquals("chat-123", response.chat.id)
         assertEquals("ws-123", response.chat.workspaceId)
         assertEquals("proj-123", response.chat.projectId)
+    }
+
+    @Test
+    fun serializesSavedChatWithoutPlaintextMessages() {
+        val envelope = SavedChatE2ee.envelope(
+            tenantId = "default",
+            userId = "user-1",
+            title = "private title",
+            messages = listOf(ChatMessage(role = "user", content = "do not leak this")),
+            keyProvider = FakeKeyProvider()
+        )
+        val encoded = json.encodeToString(
+            ChatUpdateRequest.serializer(),
+            ChatUpdateRequest(
+                tenantId = "default",
+                userId = "user-1",
+                workspaceId = "ws-123",
+                projectId = "proj-123",
+                title = "private title",
+                messages = emptyList(),
+                e2ee = envelope
+            )
+        )
+
+        assertTrue(encoded.contains("\"messages\":[]"))
+        assertTrue(encoded.contains("\"saved_chat\""))
+        assertTrue(encoded.contains("\"android_keystore_aes_gcm_v1\""))
+        assertFalse(encoded.contains("do not leak this"))
+    }
+
+    private class FakeKeyProvider : SavedChatKeyProvider {
+        override fun keyId(tenantId: String, userId: String): String = "test-key"
+
+        override fun encrypt(
+            tenantId: String,
+            userId: String,
+            aad: ByteArray,
+            plaintext: ByteArray
+        ): EncryptedBytes =
+            EncryptedBytes(
+                nonce = byteArrayOf(1, 2, 3, 4),
+                ciphertext = plaintext.reversedArray()
+            )
+
+        override fun decrypt(
+            tenantId: String,
+            userId: String,
+            aad: ByteArray,
+            encrypted: EncryptedBytes
+        ): ByteArray = encrypted.ciphertext.reversedArray()
     }
 }
