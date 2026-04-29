@@ -34,13 +34,45 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.time.Instant
 
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
 private const val OIDC_REDIRECT_URI = "nullxoid://auth/oidc/callback"
+
+internal fun parseSavedChatRecoveryImport(json: Json, raw: String): JsonObject {
+    val bundle = json.parseToJsonElement(raw.trim()).jsonObject
+    if (bundle["p"]?.jsonPrimitive?.contentOrNull != "nx.aik1") return bundle
+    val envelope = bundle["r"]?.jsonObject ?: error("QR import kit is missing recovery fields.")
+    return buildJsonObject {
+        put("version", 1)
+        put("purpose", "nullxoid.android.saved_chat_recovery_bundle.v1")
+        put("kit_type", "compact_qr_android_import")
+        put("requires_separate_recovery_secret", false)
+        put("tenant_id", bundle["t"]?.jsonPrimitive?.contentOrNull ?: "default")
+        put("user_id", bundle["u"]?.jsonPrimitive?.contentOrNull ?: "anonymous")
+        put("epoch", bundle["e"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1)
+        put("plaintext_storage", "forbidden")
+        put("recovery_secret", bundle["k"]?.jsonPrimitive?.contentOrNull.orEmpty())
+        put("recovery_secret_boundary", "user_initiated_qr_transfer")
+        put(
+            "recovery_envelope",
+            buildJsonObject {
+                put("version", 1)
+                put("algorithm", "AES-GCM")
+                put("salt", envelope["s"]?.jsonPrimitive?.contentOrNull.orEmpty())
+                put("nonce", envelope["n"]?.jsonPrimitive?.contentOrNull.orEmpty())
+                put("ciphertext", envelope["c"]?.jsonPrimitive?.contentOrNull.orEmpty())
+                put("plaintext_storage", "forbidden")
+            }
+        )
+    }
+}
 
 internal fun estimateStreamTokens(text: String): Int =
     if (text.isBlank()) 0 else maxOf(1, (text.length + 3) / 4)
@@ -495,7 +527,7 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(passkeyLoading = true, error = null, notice = null)
             var importWasTwoPartBundle = false
             runCatching {
-                val bundle = importJson.parseToJsonElement(recoveryBundleJson.trim()).jsonObject
+                val bundle = parseSavedChatRecoveryImport(importJson, recoveryBundleJson)
                 val bundledSecret = bundle["recovery_secret"]?.jsonPrimitive?.contentOrNull.orEmpty()
                 importWasTwoPartBundle = bundledSecret.isBlank()
                 val resolvedSecret = recoverySecret.trim().ifBlank { bundledSecret.trim() }
