@@ -10,10 +10,12 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
@@ -27,6 +29,10 @@ interface SavedChatKeyProvider {
     fun decrypt(tenantId: String, userId: String, aad: ByteArray, encrypted: EncryptedBytes): ByteArray
 }
 
+interface SavedChatAccountKeyProvider {
+    fun accountKey(tenantId: String, userId: String, epoch: Int): ByteArray?
+}
+
 data class EncryptedBytes(
     val nonce: ByteArray,
     val ciphertext: ByteArray
@@ -34,6 +40,8 @@ data class EncryptedBytes(
 
 object SavedChatE2ee {
     private const val AAD = "saved_chats_android_v1"
+    private const val WEB_AAD_PREFIX = "nullxoid:saved_chats:v1"
+    private const val DEVICE_EPOCH_AAD = "nullxoid:e2ee:epoch:v1"
     private const val ANDROID_KEY_ENVELOPE = "android_keystore_aes_gcm_v1"
     private const val BROWSER_INDEXEDDB_KEY_ENVELOPE = "device_indexeddb_non_extractable_v1"
     private const val BROWSER_LOCAL_STORAGE_KEY_ENVELOPE = "device_local_storage_fallback_v1"
@@ -83,19 +91,56 @@ object SavedChatE2ee {
         tenantId: String,
         userId: String,
         e2ee: JsonObject?,
-        keyProvider: SavedChatKeyProvider
+        keyProvider: SavedChatKeyProvider,
+        accountKeyProvider: SavedChatAccountKeyProvider? = null
     ): SavedChatPayload? {
         val savedChat = e2ee?.get("saved_chat")?.jsonObject ?: return null
         val version = savedChat["version"]?.jsonPrimitive?.intOrNull ?: return null
         if (version != 1) return null
+        if (savedChat["key_envelope"]?.jsonPrimitive?.content == ACCOUNT_WRAPPED_KEY_ENVELOPE) {
+            return decryptAccountWrappedPayload(
+                tenantId = tenantId,
+                userId = userId,
+                savedChat = savedChat,
+                accountKeyProvider = accountKeyProvider
+            )
+        }
         val aad = savedChat["aad"]?.jsonPrimitive?.content ?: AAD
-        val nonce = savedChat["nonce"]?.jsonPrimitive?.content?.base64Decode() ?: return null
-        val ciphertext = savedChat["ciphertext"]?.jsonPrimitive?.content?.base64Decode() ?: return null
+        val nonce = savedChat["nonce"]?.jsonPrimitive?.content?.decodeBase64Flexible() ?: return null
+        val ciphertext = savedChat["ciphertext"]?.jsonPrimitive?.content?.decodeBase64Flexible() ?: return null
         val cleartext = keyProvider.decrypt(
             tenantId = tenantId,
             userId = userId,
             aad = aad.toByteArray(Charsets.UTF_8),
             encrypted = EncryptedBytes(nonce = nonce, ciphertext = ciphertext)
+        )
+        return json.decodeFromString<SavedChatPayload>(cleartext.toString(Charsets.UTF_8))
+    }
+
+    private fun decryptAccountWrappedPayload(
+        tenantId: String,
+        userId: String,
+        savedChat: JsonObject,
+        accountKeyProvider: SavedChatAccountKeyProvider?
+    ): SavedChatPayload? {
+        val epoch = savedChat["epoch"]?.jsonPrimitive?.intOrNull ?: 1
+        val accountKey = accountKeyProvider?.accountKey(tenantId, userId, epoch) ?: return null
+        val wrappedKey = savedChat["wrapped_key"]?.jsonObject ?: return null
+        val wrappedPlaintext = decryptAesGcm(
+            keyBytes = accountKey,
+            nonce = wrappedKey["nonce"]?.jsonPrimitive?.content?.decodeBase64Flexible() ?: return null,
+            ciphertext = wrappedKey["ciphertext"]?.jsonPrimitive?.content?.decodeBase64Flexible() ?: return null,
+            aad = accountEpochAad(tenantId, userId, epoch).toByteArray(Charsets.UTF_8)
+        )
+        val wrappedPayload = json.parseToJsonElement(wrappedPlaintext.toString(Charsets.UTF_8)).jsonObject
+        if (wrappedPayload["purpose"]?.jsonPrimitive?.content != "saved_chat_content_key") return null
+        if ((wrappedPayload["version"]?.jsonPrimitive?.intOrNull ?: 0) != 1) return null
+        val contentKey = wrappedPayload["content_key"]?.jsonPrimitive?.content?.decodeBase64Flexible() ?: return null
+        val cleartext = decryptAesGcm(
+            keyBytes = contentKey,
+            nonce = savedChat["nonce"]?.jsonPrimitive?.content?.decodeBase64Flexible() ?: return null,
+            ciphertext = savedChat["ciphertext"]?.jsonPrimitive?.content?.decodeBase64Flexible() ?: return null,
+            aad = accountWrappedSavedChatAad(tenantId, userId, epoch).toByteArray(Charsets.UTF_8)
         )
         return json.decodeFromString<SavedChatPayload>(cleartext.toString(Charsets.UTF_8))
     }
@@ -123,6 +168,19 @@ object SavedChatE2ee {
             aad = savedChat["aad"]?.jsonPrimitive?.content.orEmpty()
         )
     }
+
+    fun accountEpochAad(tenantId: String, userId: String, epoch: Int): String =
+        canonicalJson(
+            mapOf(
+                "purpose" to DEVICE_EPOCH_AAD,
+                "tenant_id" to tenantId.ifBlank { "default" },
+                "user_id" to userId.ifBlank { "anonymous" },
+                "epoch" to epoch
+            )
+        )
+
+    fun accountWrappedSavedChatAad(tenantId: String, userId: String, epoch: Int): String =
+        "$WEB_AAD_PREFIX:${tenantId.ifBlank { "default" }}:${userId.ifBlank { "anonymous" }}:account_epoch:$epoch"
 }
 
 class AndroidSavedChatKeyProvider : SavedChatKeyProvider {
@@ -209,5 +267,33 @@ private fun ByteArray.base64(): String =
 private fun ByteArray.base64Url(): String =
     Base64.getUrlEncoder().withoutPadding().encodeToString(this)
 
-private fun String.base64Decode(): ByteArray =
-    Base64.getDecoder().decode(this)
+private fun String.decodeBase64Flexible(): ByteArray =
+    runCatching { Base64.getDecoder().decode(this) }
+        .getOrElse { Base64.getUrlDecoder().decode(this) }
+
+private fun decryptAesGcm(
+    keyBytes: ByteArray,
+    nonce: ByteArray,
+    ciphertext: ByteArray,
+    aad: ByteArray
+): ByteArray {
+    val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+    cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(128, nonce))
+    cipher.updateAAD(aad)
+    return cipher.doFinal(ciphertext)
+}
+
+private fun canonicalJson(value: Any?): String = when (value) {
+    null -> "null"
+    is String -> Json.encodeToString(value)
+    is Number, is Boolean -> value.toString()
+    is Map<*, *> -> value.keys
+        .map { it.toString() }
+        .sorted()
+        .joinToString(prefix = "{", postfix = "}") { key ->
+            "${Json.encodeToString(key)}:${canonicalJson(value[key])}"
+        }
+    is List<*> -> value.joinToString(prefix = "[", postfix = "]") { canonicalJson(it) }
+    is JsonElement -> value.toString()
+    else -> Json.encodeToString(value.toString())
+}

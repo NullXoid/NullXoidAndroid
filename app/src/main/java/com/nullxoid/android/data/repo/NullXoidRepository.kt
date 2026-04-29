@@ -7,6 +7,7 @@ import com.nullxoid.android.data.api.NullXoidApi
 import com.nullxoid.android.data.auth.NativeAuthCoordinator
 import com.nullxoid.android.data.auth.OidcLaunch
 import com.nullxoid.android.data.e2ee.AndroidSavedChatKeyProvider
+import com.nullxoid.android.data.e2ee.SavedChatAccountKeyProvider
 import com.nullxoid.android.data.e2ee.SavedChatE2ee
 import com.nullxoid.android.data.e2ee.SavedChatKeyProvider
 import com.nullxoid.android.data.model.AuthState
@@ -38,7 +39,8 @@ import kotlinx.coroutines.flow.flow
  */
 class NullXoidRepository(
     private val settingsStore: SettingsStore,
-    private val savedChatKeyProvider: SavedChatKeyProvider = AndroidSavedChatKeyProvider()
+    private val savedChatKeyProvider: SavedChatKeyProvider = AndroidSavedChatKeyProvider(),
+    private val savedChatAccountKeyProvider: SavedChatAccountKeyProvider? = null
 ) {
     private val api = NullXoidApi { currentBaseUrl }
     private val nativeAuth = NativeAuthCoordinator(api)
@@ -286,7 +288,8 @@ class NullXoidRepository(
                 tenantId = auth.tenantId.orEmpty(),
                 userId = auth.userId.orEmpty(),
                 e2ee = chat.e2ee,
-                keyProvider = savedChatKeyProvider
+                keyProvider = savedChatKeyProvider,
+                accountKeyProvider = savedChatAccountKeyProvider
             )
         }.getOrNull() ?: return chat.copy(e2eeStatus = envelopeInfo.status)
         return chat.copy(

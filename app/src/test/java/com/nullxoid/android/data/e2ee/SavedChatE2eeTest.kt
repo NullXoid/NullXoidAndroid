@@ -1,6 +1,10 @@
 package com.nullxoid.android.data.e2ee
 
 import com.nullxoid.android.data.model.ChatMessage
+import java.util.Base64
+import javax.crypto.Cipher
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -122,6 +126,71 @@ class SavedChatE2eeTest {
         assertEquals("account_epoch_wrapped_key", info.status)
     }
 
+    @Test
+    fun accountWrappedSavedChatEnvelopeDecryptsWithAccountEpochKey() {
+        val tenantId = "default"
+        val userId = "shared-user"
+        val epoch = 3
+        val accountKey = ByteArray(32) { (it + 1).toByte() }
+        val contentKey = ByteArray(32) { (it + 41).toByte() }
+        val savedPayload = """{"title":"Shared private title","messages":[{"role":"user","content":"private prompt"}]}"""
+        val wrappedPayload = """{"version":1,"purpose":"saved_chat_content_key","content_key":"${contentKey.base64Url()}"}"""
+
+        val wrappedEncrypted = encryptAesGcm(
+            key = accountKey,
+            nonce = ByteArray(12) { (it + 7).toByte() },
+            aad = SavedChatE2ee.accountEpochAad(tenantId, userId, epoch),
+            plaintext = wrappedPayload
+        )
+        val savedEncrypted = encryptAesGcm(
+            key = contentKey,
+            nonce = ByteArray(12) { (it + 19).toByte() },
+            aad = SavedChatE2ee.accountWrappedSavedChatAad(tenantId, userId, epoch),
+            plaintext = savedPayload
+        )
+        val envelope = buildJsonObject {
+            put(
+                "saved_chat",
+                buildJsonObject {
+                    put("version", 1)
+                    put("algorithm", "AES-GCM")
+                    put("boundary", "client_or_device")
+                    put("key_scope", "account_epoch_wrapped_saved_chat_key")
+                    put("key_envelope", "account_epoch_wrapped_saved_chat_key_v1")
+                    put("key_id", "account-root-key:shared")
+                    put("epoch", epoch)
+                    put("aad", "saved_chats_scope_v1")
+                    put("nonce", savedEncrypted.nonce.base64Url())
+                    put("ciphertext", savedEncrypted.ciphertext.base64Url())
+                    put(
+                        "wrapped_key",
+                        buildJsonObject {
+                            put("version", 1)
+                            put("algorithm", "AES-GCM")
+                            put("boundary", "account_epoch_key")
+                            put("key_scope", "active_non_revoked_devices")
+                            put("epoch", epoch)
+                            put("plaintext_storage", "forbidden")
+                            put("nonce", wrappedEncrypted.nonce.base64Url())
+                            put("ciphertext", wrappedEncrypted.ciphertext.base64Url())
+                        }
+                    )
+                }
+            )
+        }
+
+        val payload = SavedChatE2ee.decryptPayload(
+            tenantId = tenantId,
+            userId = userId,
+            e2ee = envelope,
+            keyProvider = FakeKeyProvider(),
+            accountKeyProvider = StaticAccountKeyProvider(accountKey)
+        )
+
+        assertEquals("Shared private title", payload?.title)
+        assertEquals("private prompt", payload?.messages?.single()?.content)
+    }
+
     private class FakeKeyProvider : SavedChatKeyProvider {
         override fun keyId(tenantId: String, userId: String): String = "test-key"
 
@@ -143,4 +212,25 @@ class SavedChatE2eeTest {
             encrypted: EncryptedBytes
         ): ByteArray = encrypted.ciphertext.reversedArray()
     }
+
+    private class StaticAccountKeyProvider(private val key: ByteArray) : SavedChatAccountKeyProvider {
+        override fun accountKey(tenantId: String, userId: String, epoch: Int): ByteArray = key
+    }
+
+    private data class TestEncrypted(val nonce: ByteArray, val ciphertext: ByteArray)
+
+    private fun encryptAesGcm(
+        key: ByteArray,
+        nonce: ByteArray,
+        aad: String,
+        plaintext: String
+    ): TestEncrypted {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))
+        cipher.updateAAD(aad.toByteArray(Charsets.UTF_8))
+        return TestEncrypted(nonce = nonce, ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8)))
+    }
+
+    private fun ByteArray.base64Url(): String =
+        Base64.getUrlEncoder().withoutPadding().encodeToString(this)
 }
