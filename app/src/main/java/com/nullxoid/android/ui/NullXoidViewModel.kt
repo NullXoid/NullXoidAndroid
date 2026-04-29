@@ -497,6 +497,9 @@ class NullXoidViewModel(
                 val bundle = importJson.parseToJsonElement(recoveryBundleJson.trim()).jsonObject
                 val bundledSecret = bundle["recovery_secret"]?.jsonPrimitive?.contentOrNull.orEmpty()
                 val resolvedSecret = recoverySecret.trim().ifBlank { bundledSecret.trim() }
+                require(resolvedSecret.isNotBlank()) {
+                    "This looks like an older two-part recovery bundle. Since you do not have the recovery secret, go to the web app, open Settings > Privacy/Security, click Copy Android import kit, then paste that full new JSON here with the recovery secret field blank."
+                }
                 repo.importSavedChatRecoveryEnvelope(resolvedSecret, bundle)
             }
                 .onSuccess { epoch ->
@@ -531,6 +534,7 @@ class NullXoidViewModel(
             message.contains("BAD_DECRYPT", ignoreCase = true) ||
                 message.contains("did not unlock", ignoreCase = true) ->
                 "Saved-chat recovery did not unlock. Paste a fresh Android import kit copied from the same signed-in browser account, or use the matching recovery secret with the matching bundle."
+            message.contains("older two-part recovery bundle", ignoreCase = true) -> message
             message.isNotBlank() -> message
             else -> "Saved-chat recovery import failed."
         }

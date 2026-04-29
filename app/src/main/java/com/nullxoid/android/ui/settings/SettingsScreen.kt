@@ -232,7 +232,7 @@ fun SettingsScreen(
             Text("Saved-chat recovery", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Paste the Android import kit copied from the signed-in browser. Older two-part bundles can still use the optional recovery secret field.",
+                "If you do not remember a recovery secret, use the web app: Settings > Privacy/Security > Copy Android import kit. Paste that full JSON below and leave the optional secret field blank.",
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(8.dp))
@@ -265,7 +265,7 @@ fun SettingsScreen(
                     !state.passkeyLoading,
                 onClick = { onImportSavedChatRecovery(recoverySecretDraft, recoveryEnvelopeDraft) }
             ) {
-                Text(if (state.passkeyLoading) "Importing" else "Import E2EE key")
+                Text(if (state.passkeyLoading) "Importing" else "Import Android kit")
             }
 
             Spacer(Modifier.height(24.dp))
