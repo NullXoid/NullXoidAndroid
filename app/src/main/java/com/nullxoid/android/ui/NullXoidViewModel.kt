@@ -14,6 +14,7 @@ import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.ChatMessage
 import com.nullxoid.android.data.model.ChatRecord
 import com.nullxoid.android.data.model.ChatSession
+import com.nullxoid.android.data.model.ClientManifest
 import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.PasskeyCredentialRecord
@@ -120,6 +121,7 @@ data class AppUiState(
     val lastStreamMetric: String = "",
     val lastFailedPrompt: String? = null,
     val health: HealthFeatures? = null,
+    val clientManifest: ClientManifest? = null,
     val embeddedEnabled: Boolean = false,
     val embeddedEngine: String = SettingsStore.EMBEDDED_ENGINE_ECHO,
     val ollamaUrl: String = SettingsStore.DEFAULT_OLLAMA_URL,
@@ -166,15 +168,23 @@ class NullXoidViewModel(
             val onboardingCompleted = runCatching { settingsStore.onboardingCompleted.first() }
                 .getOrDefault(false)
             if (embedded) ensureBackendRunning()
+            val manifest = runCatching { repo.clientManifest() }.getOrNull()
             val auth = runCatching { repo.bootstrap() }.getOrElse { AuthState() }
+            val manifestUpdateSource = updateSourceAllowedByManifest(
+                AppUiState(updateSource = updateSource, clientManifest = manifest)
+            )
+            if (manifestUpdateSource != updateSource) {
+                settingsStore.setUpdateSource(manifestUpdateSource)
+            }
             _state.value = _state.value.copy(
                 loading = false,
                 embeddedEnabled = embedded,
                 embeddedEngine = embeddedEngine,
                 ollamaUrl = ollamaUrl,
                 ollamaModel = ollamaModel,
-                updateSource = updateSource,
+                updateSource = manifestUpdateSource,
                 onboardingCompleted = onboardingCompleted,
+                clientManifest = manifest,
                 auth = auth,
                 backendUrl = url,
                 selectedModel = repo.selectedModel()
@@ -191,6 +201,14 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(backendUrl = url)
             runCatching { repo.health() }.onSuccess { health ->
                 _state.value = _state.value.copy(health = health)
+            }
+            runCatching { repo.clientManifest() }.onSuccess { manifest ->
+                val next = _state.value.copy(clientManifest = manifest)
+                val source = updateSourceAllowedByManifest(next)
+                if (source != next.updateSource) {
+                    settingsStore.setUpdateSource(source)
+                }
+                _state.value = next.copy(updateSource = source)
             }
             if (_state.value.auth.authenticated) {
                 runCatching { repo.models() }.onSuccess { list ->
@@ -357,6 +375,15 @@ class NullXoidViewModel(
 
     fun refreshHealth() {
         viewModelScope.launch {
+            runCatching { repo.clientManifest() }
+                .onSuccess {
+                    val next = _state.value.copy(clientManifest = it)
+                    val source = updateSourceAllowedByManifest(next)
+                    if (source != next.updateSource) {
+                        settingsStore.setUpdateSource(source)
+                    }
+                    _state.value = next.copy(updateSource = source)
+                }
             runCatching { repo.health() }
                 .onSuccess { _state.value = _state.value.copy(health = it) }
                 .onFailure { t -> _state.value = _state.value.copy(error = t.message) }

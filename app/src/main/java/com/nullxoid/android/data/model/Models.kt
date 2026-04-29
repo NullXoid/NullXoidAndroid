@@ -233,6 +233,29 @@ data class HealthFeatures(
 )
 
 @Serializable
+data class ClientManifestUpdates(
+    val channels: List<String> = emptyList(),
+    @SerialName("recommended_channel") val recommendedChannel: String? = null
+)
+
+@Serializable
+data class ClientManifestBilling(
+    val enabled: Boolean = false,
+    @SerialName("active_plan") val activePlan: String? = null
+)
+
+@Serializable
+data class ClientManifest(
+    val ok: Boolean = true,
+    @SerialName("schema_version") val schemaVersion: Int = 0,
+    val platform: String = "android",
+    val features: JsonObject? = null,
+    val menus: List<JsonObject> = emptyList(),
+    val updates: ClientManifestUpdates? = null,
+    val billing: ClientManifestBilling? = null
+)
+
+@Serializable
 data class RemoteSettings(
     val settings: JsonObject? = null,
     val defaults: JsonObject? = null,

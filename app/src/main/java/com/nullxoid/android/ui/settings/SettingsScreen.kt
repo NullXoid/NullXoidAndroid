@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.ui.AppUiState
+import com.nullxoid.android.ui.availableUpdateSources
 import com.nullxoid.android.ui.passkeyEnrollmentStatusText
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -252,22 +253,29 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
             Text("Release channel", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
+            val updateSources = availableUpdateSources(state)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = state.updateSource == SettingsStore.UPDATE_SOURCE_AUTO,
-                    onClick = { onSelectUpdateSource(SettingsStore.UPDATE_SOURCE_AUTO) },
-                    label = { Text("Auto") }
-                )
-                FilterChip(
-                    selected = state.updateSource == SettingsStore.UPDATE_SOURCE_FORGEJO,
-                    onClick = { onSelectUpdateSource(SettingsStore.UPDATE_SOURCE_FORGEJO) },
-                    label = { Text("Forgejo") }
-                )
-                FilterChip(
-                    selected = state.updateSource == SettingsStore.UPDATE_SOURCE_GITHUB,
-                    onClick = { onSelectUpdateSource(SettingsStore.UPDATE_SOURCE_GITHUB) },
-                    label = { Text("GitHub") }
-                )
+                if (SettingsStore.UPDATE_SOURCE_AUTO in updateSources) {
+                    FilterChip(
+                        selected = state.updateSource == SettingsStore.UPDATE_SOURCE_AUTO,
+                        onClick = { onSelectUpdateSource(SettingsStore.UPDATE_SOURCE_AUTO) },
+                        label = { Text("Auto") }
+                    )
+                }
+                if (SettingsStore.UPDATE_SOURCE_FORGEJO in updateSources) {
+                    FilterChip(
+                        selected = state.updateSource == SettingsStore.UPDATE_SOURCE_FORGEJO,
+                        onClick = { onSelectUpdateSource(SettingsStore.UPDATE_SOURCE_FORGEJO) },
+                        label = { Text("Forgejo") }
+                    )
+                }
+                if (SettingsStore.UPDATE_SOURCE_GITHUB in updateSources) {
+                    FilterChip(
+                        selected = state.updateSource == SettingsStore.UPDATE_SOURCE_GITHUB,
+                        onClick = { onSelectUpdateSource(SettingsStore.UPDATE_SOURCE_GITHUB) },
+                        label = { Text("GitHub") }
+                    )
+                }
             }
             Spacer(Modifier.height(8.dp))
             Text(

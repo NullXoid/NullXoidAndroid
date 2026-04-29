@@ -5,6 +5,7 @@ import com.nullxoid.android.data.model.ChatCreateRequest
 import com.nullxoid.android.data.model.ChatCreateResponse
 import com.nullxoid.android.data.model.ChatListResponse
 import com.nullxoid.android.data.model.ChatRecord
+import com.nullxoid.android.data.model.ClientManifest
 import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.LoginRequest
 import com.nullxoid.android.data.model.ModelListResponse
@@ -129,6 +130,9 @@ class NullXoidApi(
     // ---- Health ---------------------------------------------------------
 
     suspend fun healthFeatures(): HealthFeatures = getJson("/health/features")
+
+    suspend fun clientManifest(platform: String = "android"): ClientManifest =
+        getJson("/api/client-manifest?platform=${urlEncode(platform)}")
 
     // ---- Settings / Models ---------------------------------------------
 

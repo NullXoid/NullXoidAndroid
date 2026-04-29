@@ -11,6 +11,7 @@ import com.nullxoid.android.data.model.ChatCreateRequest
 import com.nullxoid.android.data.model.ChatMessage
 import com.nullxoid.android.data.model.ChatRecord
 import com.nullxoid.android.data.model.ChatStreamRequest
+import com.nullxoid.android.data.model.ClientManifest
 import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.OidcCompleteRequest
@@ -169,6 +170,8 @@ class NullXoidRepository(
         api.archiveChat(chatId, archived)
 
     suspend fun health(): HealthFeatures = api.healthFeatures()
+
+    suspend fun clientManifest(): ClientManifest = api.clientManifest("android")
 
     fun streamReply(
         model: String,
