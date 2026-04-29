@@ -40,12 +40,13 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.nullxoid.android.data.prefs.SettingsStore
-import com.nullxoid.android.ui.AppUiState
-import com.nullxoid.android.ui.availableUpdateSources
-import com.nullxoid.android.ui.passkeyEnrollmentStatusText
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import com.nullxoid.android.data.prefs.SettingsStore
+import com.nullxoid.android.ui.AppUiState
+import com.nullxoid.android.ui.qr.NullXoidQrCaptureActivity
+import com.nullxoid.android.ui.availableUpdateSources
+import com.nullxoid.android.ui.passkeyEnrollmentStatusText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -259,8 +260,9 @@ fun SettingsScreen(
                     onClick = {
                         qrScanner.launch(
                             ScanOptions()
+                                .setCaptureActivity(NullXoidQrCaptureActivity::class.java)
                                 .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                .setPrompt("Scan NullXoid Android import kit")
+                                .setPrompt("Scan NullXoid QR import kit")
                                 .setBeepEnabled(false)
                                 .setOrientationLocked(false)
                         )

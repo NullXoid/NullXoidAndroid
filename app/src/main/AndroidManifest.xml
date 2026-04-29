@@ -21,6 +21,15 @@
         android:theme="@style/Theme.NullXoid">
 
         <activity
+            android:name=".ui.qr.NullXoidQrCaptureActivity"
+            android:exported="false"
+            android:label="Scan QR code"
+            android:screenOrientation="fullSensor"
+            android:stateNotNeeded="true"
+            android:theme="@style/zxing_CaptureTheme"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
