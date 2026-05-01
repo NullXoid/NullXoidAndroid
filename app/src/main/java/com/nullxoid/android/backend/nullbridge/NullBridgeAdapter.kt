@@ -27,10 +27,14 @@ class NullBridgeAdapter(
     private val client: OkHttpClient = OkHttpClient(),
     private val json: Json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 ) {
-    private val backendId: String = config("NULLBRIDGE_ANDROID_BACKEND_ID", "android_backend")
+    private val backendId: String = config("NULLBRIDGE_SERVICE_ID", "")
+        .ifBlank { config("NULLBRIDGE_ANDROID_BACKEND_ID", "android_backend") }
     private val audience: String = config("NULLBRIDGE_SERVICE_JWT_AUDIENCE", "nullbridge")
-    private val baseUrl: String = config("NULLBRIDGE_URL", "").trimEnd('/')
-    private val serviceSecret: String = config("NULLBRIDGE_ANDROID_SERVICE_JWT_SECRET", "")
+    private val baseUrl: String = config("NULLBRIDGE_BASE_URL", "")
+        .ifBlank { config("NULLBRIDGE_URL", "") }
+        .trimEnd('/')
+    private val serviceSecret: String = config("NULLBRIDGE_SERVICE_TOKEN", "")
+        .ifBlank { config("NULLBRIDGE_ANDROID_SERVICE_JWT_SECRET", "") }
 
     fun status(): JsonObject = buildJsonObject {
         put("ok", true)
@@ -53,7 +57,7 @@ class NullBridgeAdapter(
             return@withContext buildJsonObject {
                 put("ok", false)
                 put("configured", false)
-                put("errorCode", "nullbridge.not_configured")
+                put("errorCode", "NULLBRIDGE_CREDENTIAL_NOT_CONFIGURED")
                 put("error", "NullBridge URL or Android service JWT secret is not configured")
             }
         }
@@ -107,6 +111,26 @@ class NullBridgeAdapter(
         }
     }
 
+    suspend fun demoRoute(echo: String, actingUser: JsonObject): JsonObject =
+        routeCheck(
+            capability = DEMO_CAPABILITY,
+            targetRole = DEMO_TARGET_ROLE,
+            targetId = DEMO_TARGET_ID,
+            payload = buildJsonObject {
+                put("action", DEMO_ACTION)
+                put("echo", echo)
+            },
+            actingUser = actingUser
+        )
+
+    fun denyUnsupported(capability: String = UNSUPPORTED_CAPABILITY): JsonObject = buildJsonObject {
+        put("ok", false)
+        put("accepted", false)
+        put("executed", false)
+        put("capability", capability)
+        put("errorCode", "CAPABILITY_NOT_SUPPORTED")
+    }
+
     private fun mintServiceJwt(capability: String, targetRole: String, requestId: String): String {
         val now = Instant.now().epochSecond
         val header = buildJsonObject {
@@ -143,5 +167,10 @@ class NullBridgeAdapter(
 
     companion object {
         private val JSON = "application/json".toMediaType()
+        const val DEMO_CAPABILITY = "suite.demo.echo"
+        const val DEMO_ACTION = "route.approved.echo"
+        const val DEMO_TARGET_ROLE = "diagnostics"
+        const val DEMO_TARGET_ID = "diagnostics_service"
+        const val UNSUPPORTED_CAPABILITY = "suite.unsupported.route"
     }
 }

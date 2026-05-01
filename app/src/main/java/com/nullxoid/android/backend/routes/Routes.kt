@@ -171,6 +171,24 @@ private fun Route.nullBridgeRoutes(store: EmbeddedStore, adapter: NullBridgeAdap
         }
         call.respond(adapter.routeCheck(capability, targetRole, targetId, payload, actingUser))
     }
+
+    post("/api/android/nullbridge/demo-route") {
+        val body = call.receive<JsonObject>()
+        val echo = body["echo"]?.toString()?.trim('"') ?: "m35 demo echo"
+        val auth = store.auth()
+        val actingUser = buildJsonObject {
+            put("userId", auth.userId ?: "android_local_user")
+            put("roles", JsonArray(auth.roles.map { JsonPrimitive(it) }))
+            put("platform", "android")
+        }
+        call.respond(adapter.demoRoute(echo, actingUser))
+    }
+
+    post("/api/android/nullbridge/unsupported-route") {
+        val body = call.receive<JsonObject>()
+        val capability = body["capability"]?.toString()?.trim('"') ?: NullBridgeAdapter.UNSUPPORTED_CAPABILITY
+        call.respond(adapter.denyUnsupported(capability))
+    }
 }
 
 private fun Route.modelRoutes(engine: LlmEngine) {
