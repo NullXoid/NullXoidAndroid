@@ -229,6 +229,66 @@ private fun Route.settingsRoutes(engine: LlmEngine) {
 private const val localImageStudioId = "local-image-studio"
 private const val localImageStudioAction = "media.image.generate.local"
 private const val localImageStudioCapability = "suite.media.image.generate"
+private const val localVideoStudioId = "local-video-studio"
+private const val localVideoStudioAction = "media.video.generate.local"
+private const val localVideoStudioCapability = "suite.media.video.generate"
+private const val local3dStudioId = "local-3d-studio"
+private const val local3dStudioAction = "media.model3d.generate.local"
+private const val local3dStudioCapability = "suite.media.model3d.generate"
+
+private data class StoreAddonFixture(
+    val id: String,
+    val name: String,
+    val subcategory: String,
+    val description: String,
+    val capability: String,
+    val action: String,
+    val approvalTitle: String,
+    val approvalSummary: String,
+    val providerKinds: List<String>,
+    val artifactScope: String,
+    val defaultOutputFormat: String? = null
+)
+
+private val storeAddonFixtures = listOf(
+    StoreAddonFixture(
+        id = localImageStudioId,
+        name = "Local Image Studio",
+        subcategory = "image-generation",
+        description = "Generate private local images through an approval-gated backend workflow.",
+        capability = localImageStudioCapability,
+        action = localImageStudioAction,
+        approvalTitle = "Approve image generation?",
+        approvalSummary = "Local Image Studio wants to generate an image.",
+        providerKinds = listOf("mock", "local-image-engine"),
+        artifactScope = "private-generated-image"
+    ),
+    StoreAddonFixture(
+        id = localVideoStudioId,
+        name = "Local Video Studio",
+        subcategory = "video-generation",
+        description = "Generate private local videos through an approval-gated backend workflow.",
+        capability = localVideoStudioCapability,
+        action = localVideoStudioAction,
+        approvalTitle = "Approve video generation?",
+        approvalSummary = "Local Video Studio wants to generate a video.",
+        providerKinds = listOf("mock-video", "local-video-engine"),
+        artifactScope = "private-generated-video"
+    ),
+    StoreAddonFixture(
+        id = local3dStudioId,
+        name = "Local 3D Studio",
+        subcategory = "3d-generation",
+        description = "Generate private GLB/glTF model artifacts through an approval-gated backend workflow.",
+        capability = local3dStudioCapability,
+        action = local3dStudioAction,
+        approvalTitle = "Approve 3D model generation?",
+        approvalSummary = "Local 3D Studio wants to generate a 3D model.",
+        providerKinds = listOf("mock-3d", "local-3d-engine"),
+        artifactScope = "private-generated-3d-model",
+        defaultOutputFormat = "glb"
+    )
+)
 
 private fun storeCatalogJson(): JsonObject = buildJsonObject {
     put("ok", true)
@@ -251,32 +311,36 @@ private fun storeCatalogJson(): JsonObject = buildJsonObject {
             }
         )
     )
-    put("addons", JsonArray(listOf(localImageStudioJson())))
+    put("addons", JsonArray(storeAddonFixtures.map(::storeAddonJson)))
 }
 
-private fun localImageStudioJson(): JsonObject = buildJsonObject {
-    put("id", localImageStudioId)
-    put("name", "Local Image Studio")
+private fun storeAddonJson(addon: StoreAddonFixture): JsonObject = buildJsonObject {
+    put("id", addon.id)
+    put("name", addon.name)
     put("category", "creative-workflows")
     put("categoryLabel", "Creative Workflows")
-    put("subcategory", "image-generation")
-    put("description", "Generate private local images through an approval-gated backend workflow.")
+    put("subcategory", addon.subcategory)
+    put("description", addon.description)
     put("status", "alpha")
     put("enabled", true)
     put("visibility", "local-debug")
     put("platforms", JsonArray(listOf("web", "android", "windows").map(::JsonPrimitive)))
-    put("capabilities", JsonArray(listOf(localImageStudioCapability).map(::JsonPrimitive)))
+    put("capabilities", JsonArray(listOf(addon.capability).map(::JsonPrimitive)))
     put("requiresApproval", true)
     put(
         "approvalRoute",
         buildJsonObject {
-            put("title", "Approve image generation?")
-            put("summary", "Local Image Studio wants to generate an image.")
+            put("title", addon.approvalTitle)
+            put("summary", addon.approvalSummary)
             put("risk", "medium")
-            put("action", localImageStudioAction)
+            put("action", addon.action)
         }
     )
-    put("providerKinds", JsonArray(listOf("mock", "local-image-engine", "local-video-engine").map(::JsonPrimitive)))
+    put("providerKinds", JsonArray(addon.providerKinds.map(::JsonPrimitive)))
+    addon.defaultOutputFormat?.let {
+        put("defaultOutputFormat", it)
+        put("outputFormats", JsonArray(listOf("glb", "gltf").map(::JsonPrimitive)))
+    }
     put(
         "permissions",
         JsonArray(
@@ -287,7 +351,7 @@ private fun localImageStudioJson(): JsonObject = buildJsonObject {
                 },
                 buildJsonObject {
                     put("kind", "artifact")
-                    put("scope", "private-generated-image")
+                    put("scope", addon.artifactScope)
                 }
             )
         )
@@ -295,45 +359,52 @@ private fun localImageStudioJson(): JsonObject = buildJsonObject {
     put(
         "routes",
         buildJsonObject {
-            put("detail", "/api/store/addons/$localImageStudioId")
-            put("action", "/api/store/addons/$localImageStudioId/actions/$localImageStudioAction")
-            put("gallery", "/api/store/addons/$localImageStudioId/gallery")
+            put("detail", "/api/store/addons/${addon.id}")
+            put("action", "/api/store/addons/${addon.id}/actions/${addon.action}")
+            put("gallery", "/api/store/addons/${addon.id}/gallery")
         }
     )
 }
+
+private fun storeAddonById(addonId: String): StoreAddonFixture? =
+    storeAddonFixtures.firstOrNull { it.id == addonId }
 
 private fun Route.storeRoutes() {
     get("/api/store/catalog") { call.respond(storeCatalogJson()) }
 
     get("/api/store/addons/{addonId}") {
-        if (call.parameters["addonId"] != localImageStudioId) {
+        val addon = storeAddonById(call.parameters["addonId"].orEmpty())
+        if (addon == null) {
             call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "addon not found") })
         } else {
-            call.respond(localImageStudioJson())
+            call.respond(buildJsonObject { put("ok", true); put("addon", storeAddonJson(addon)) })
         }
     }
 
     post("/api/store/addons/{addonId}/enable") {
-        if (call.parameters["addonId"] != localImageStudioId) {
+        val addon = storeAddonById(call.parameters["addonId"].orEmpty())
+        if (addon == null) {
             call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "addon not found") })
         } else {
-            call.respond(localImageStudioJson())
+            call.respond(buildJsonObject { put("ok", true); put("addon", storeAddonJson(addon)) })
         }
     }
 
     post("/api/store/addons/{addonId}/disable") {
-        if (call.parameters["addonId"] != localImageStudioId) {
+        val addon = storeAddonById(call.parameters["addonId"].orEmpty())
+        if (addon == null) {
             call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "addon not found") })
         } else {
-            call.respond(localImageStudioJson())
+            call.respond(buildJsonObject { put("ok", true); put("addon", storeAddonJson(addon)) })
         }
     }
 
     post("/api/store/addons/{addonId}/actions/{action}") {
         val addonId = call.parameters["addonId"].orEmpty()
         val action = call.parameters["action"].orEmpty()
+        val addon = storeAddonById(addonId)
         val body = call.receive<StoreActionRequest>()
-        if (addonId != localImageStudioId || action != localImageStudioAction || body.prompt.isBlank()) {
+        if (addon == null || action != addon.action || body.prompt.isBlank()) {
             call.respond(
                 HttpStatusCode.BadRequest,
                 buildJsonObject {
@@ -356,13 +427,14 @@ private fun Route.storeRoutes() {
     }
 
     get("/api/store/addons/{addonId}/gallery") {
-        if (call.parameters["addonId"] != localImageStudioId) {
+        val addonId = call.parameters["addonId"].orEmpty()
+        if (storeAddonById(addonId) == null) {
             call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "addon not found") })
         } else {
             call.respond(
                 buildJsonObject {
                     put("ok", true)
-                    put("addonId", localImageStudioId)
+                    put("addonId", addonId)
                     put("items", JsonArray(emptyList()))
                 }
             )

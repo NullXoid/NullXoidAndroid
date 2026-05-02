@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.model.StoreAddon
 import com.nullxoid.android.ui.AppUiState
 
-private const val LOCAL_IMAGE_STUDIO_ID = "local-image-studio"
+private val creativeWorkflowAddonIds = setOf("local-image-studio", "local-video-studio", "local-3d-studio")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,9 +45,11 @@ fun StoreScreen(
     state: AppUiState,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onRunLocalImageStudio: (String, String) -> Unit
+    onRunStoreAddon: (String, String, String, String, String) -> Unit
 ) {
-    val addon = state.storeCatalog.addons.firstOrNull { it.id == LOCAL_IMAGE_STUDIO_ID }
+    val addons = state.storeCatalog.addons.filter { it.category == "creative-workflows" || it.id in creativeWorkflowAddonIds }
+    var selectedAddonId by remember { mutableStateOf("local-image-studio") }
+    val addon = addons.firstOrNull { it.id == selectedAddonId } ?: addons.firstOrNull()
     var prompt by remember { mutableStateOf("") }
     var imageSize by remember { mutableStateOf("1024x1024") }
 
@@ -90,11 +92,11 @@ fun StoreScreen(
                 )
             }
 
-            if (addon == null) {
+            if (addons.isEmpty()) {
                 item {
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
-                            Text("Local Image Studio is unavailable.")
+                            Text("Creative Workflows add-ons are unavailable.")
                             if (state.storeLoading) {
                                 Spacer(Modifier.height(8.dp))
                                 Text("Loading catalog...", style = MaterialTheme.typography.bodySmall)
@@ -103,9 +105,16 @@ fun StoreScreen(
                     }
                 }
             } else {
-                item { StoreAddonCard(addon) }
+                items(addons, key = { it.id }) { item ->
+                    StoreAddonCard(
+                        addon = item,
+                        selected = item.id == addon?.id,
+                        onSelect = { selectedAddonId = item.id }
+                    )
+                }
                 item {
-                    LocalImageStudioPanel(
+                    StoreAddonPanel(
+                        addon = addon,
                         prompt = prompt,
                         imageSize = imageSize,
                         loading = state.storeLoading,
@@ -113,7 +122,17 @@ fun StoreScreen(
                         errorCode = state.storeAction?.errorCode,
                         onPromptChange = { prompt = it },
                         onImageSizeChange = { imageSize = it },
-                        onRun = { onRunLocalImageStudio(prompt, imageSize) }
+                        onRun = {
+                            addon?.let {
+                                onRunStoreAddon(
+                                    it.id,
+                                    it.approvalRoute?.action.orEmpty(),
+                                    it.capabilities.firstOrNull().orEmpty(),
+                                    prompt,
+                                    imageSize
+                                )
+                            }
+                        }
                     )
                 }
                 item {
@@ -152,11 +171,12 @@ fun StoreScreen(
 }
 
 @Composable
-private fun StoreAddonCard(addon: StoreAddon) {
+private fun StoreAddonCard(addon: StoreAddon, selected: Boolean, onSelect: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("store-local-image-studio-card")
+            .testTag("store-${addon.id}-card"),
+        onClick = onSelect
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -167,6 +187,9 @@ private fun StoreAddonCard(addon: StoreAddon) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = {}, label = { Text(addon.categoryLabel) })
                 AssistChip(onClick = {}, label = { Text(addon.visibility) })
+                if (selected) {
+                    AssistChip(onClick = {}, label = { Text("Selected") })
+                }
             }
             Text(
                 "Capability: ${addon.capabilities.firstOrNull().orEmpty()}",
@@ -179,7 +202,8 @@ private fun StoreAddonCard(addon: StoreAddon) {
 }
 
 @Composable
-private fun LocalImageStudioPanel(
+private fun StoreAddonPanel(
+    addon: StoreAddon?,
     prompt: String,
     imageSize: String,
     loading: Boolean,
@@ -192,13 +216,13 @@ private fun LocalImageStudioPanel(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("store-local-image-studio-detail")
+            .testTag("store-${addon?.id ?: "addon"}-detail")
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Local Image Studio", style = MaterialTheme.typography.titleMedium)
+            Text(addon?.name ?: "Creative Workflow", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -212,12 +236,12 @@ private fun LocalImageStudioPanel(
                 modifier = Modifier.fillMaxWidth(),
                 value = imageSize,
                 onValueChange = onImageSizeChange,
-                label = { Text("Image size") },
+                label = { Text(if (addon?.id == "local-3d-studio") "Format or size" else "Image/video size") },
                 singleLine = true
             )
             Button(
-                modifier = Modifier.testTag("store-local-image-generate"),
-                enabled = !loading,
+                modifier = Modifier.testTag("store-${addon?.id ?: "addon"}-generate"),
+                enabled = !loading && addon != null,
                 onClick = onRun
             ) {
                 Text(if (loading) "Waiting..." else "Generate with approval")

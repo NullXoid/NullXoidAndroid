@@ -318,6 +318,8 @@ data class StoreAddon(
     val requiresApproval: Boolean = false,
     val approvalRoute: StoreApprovalRoute? = null,
     val providerKinds: List<String> = emptyList(),
+    val defaultOutputFormat: String = "",
+    val outputFormats: List<String> = emptyList(),
     val permissions: List<JsonObject> = emptyList(),
     val routes: JsonObject? = null
 )
@@ -332,7 +334,11 @@ data class StoreCatalogResponse(
 @Serializable
 data class StoreActionRequest(
     val prompt: String,
-    val imageSize: String = "1024x1024"
+    val imageSize: String = "1024x1024",
+    val videoSize: String = "1024x1024",
+    val durationMs: Int = 4000,
+    val format: String = "glb",
+    val capability: String = ""
 )
 
 @Serializable
@@ -341,7 +347,12 @@ data class StoreArtifactRef(
     val thumbnailId: String = "",
     val thumbnailUrl: String = "",
     val mimeType: String = "",
-    val status: String = ""
+    val status: String = "",
+    val posterUrl: String = "",
+    val previewUrl: String = "",
+    val modelPreviewUrl: String = "",
+    val durationMs: Int = 0,
+    val format: String = ""
 )
 
 @Serializable

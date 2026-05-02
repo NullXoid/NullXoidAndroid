@@ -184,7 +184,7 @@ fun NullXoidApp(
                         state = state,
                         onBack = { nav.popBackStack() },
                         onRefresh = vm::refreshStore,
-                        onRunLocalImageStudio = vm::runLocalImageStudio
+                        onRunStoreAddon = vm::runStoreAddon
                     )
                 }
             }

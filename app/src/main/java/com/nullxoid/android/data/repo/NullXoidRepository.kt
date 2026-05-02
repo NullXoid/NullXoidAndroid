@@ -231,8 +231,27 @@ class NullXoidRepository(
 
     suspend fun storeGallery(addonId: String): StoreGalleryResponse = api.storeGallery(addonId)
 
-    suspend fun runStoreAction(addonId: String, action: String, prompt: String, imageSize: String): StoreActionResponse =
-        api.runStoreAction(addonId, action, StoreActionRequest(prompt = prompt, imageSize = imageSize))
+    suspend fun runStoreAction(
+        addonId: String,
+        action: String,
+        prompt: String,
+        imageSize: String,
+        capability: String = "",
+        durationMs: Int = 4000,
+        format: String = "glb"
+    ): StoreActionResponse =
+        api.runStoreAction(
+            addonId,
+            action,
+            StoreActionRequest(
+                prompt = prompt,
+                imageSize = imageSize,
+                videoSize = imageSize,
+                durationMs = durationMs,
+                format = format,
+                capability = capability
+            )
+        )
 
     suspend fun importSavedChatRecoveryEnvelope(recoverySecret: String, recoveryBundle: JsonObject): Int {
         val auth = requireScopedAuth()

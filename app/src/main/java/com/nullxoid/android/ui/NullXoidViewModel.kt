@@ -465,6 +465,16 @@ class NullXoidViewModel(
     }
 
     fun runLocalImageStudio(prompt: String, imageSize: String) {
+        runStoreAddon(
+            addonId = "local-image-studio",
+            action = "media.image.generate.local",
+            capability = "suite.media.image.generate",
+            prompt = prompt,
+            imageSize = imageSize
+        )
+    }
+
+    fun runStoreAddon(addonId: String, action: String, capability: String, prompt: String, imageSize: String) {
         val cleanPrompt = prompt.trim()
         if (cleanPrompt.isBlank()) {
             _state.value = _state.value.copy(error = "Prompt required")
@@ -478,20 +488,21 @@ class NullXoidViewModel(
             )
             runCatching {
                 repo.runStoreAction(
-                    addonId = "local-image-studio",
-                    action = "media.image.generate.local",
+                    addonId = addonId,
+                    action = action,
                     prompt = cleanPrompt,
-                    imageSize = imageSize
+                    imageSize = imageSize,
+                    capability = capability
                 )
             }.onSuccess { result ->
                 _state.value = _state.value.copy(storeLoading = false, storeAction = result)
-                runCatching { repo.storeGallery("local-image-studio") }
+                runCatching { repo.storeGallery(addonId) }
                     .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
             }.onFailure { t ->
                 _state.value = _state.value.copy(
                     storeLoading = false,
                     storeAction = null,
-                    error = t.message ?: "Local Image Studio failed"
+                    error = t.message ?: "Store add-on failed"
                 )
             }
         }
