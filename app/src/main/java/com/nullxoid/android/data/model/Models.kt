@@ -288,6 +288,85 @@ data class RemoteSettings(
     @SerialName("default_model") val defaultModel: String? = null
 )
 
+@Serializable
+data class StoreCategory(
+    val id: String = "",
+    val label: String = ""
+)
+
+@Serializable
+data class StoreApprovalRoute(
+    val title: String = "",
+    val summary: String = "",
+    val risk: String = "",
+    val action: String = ""
+)
+
+@Serializable
+data class StoreAddon(
+    val id: String = "",
+    val name: String = "",
+    val category: String = "",
+    val categoryLabel: String = "",
+    val subcategory: String = "",
+    val description: String = "",
+    val status: String = "",
+    val enabled: Boolean = false,
+    val visibility: String = "",
+    val platforms: List<String> = emptyList(),
+    val capabilities: List<String> = emptyList(),
+    val requiresApproval: Boolean = false,
+    val approvalRoute: StoreApprovalRoute? = null,
+    val providerKinds: List<String> = emptyList(),
+    val permissions: List<JsonObject> = emptyList(),
+    val routes: JsonObject? = null
+)
+
+@Serializable
+data class StoreCatalogResponse(
+    val ok: Boolean = true,
+    val categories: List<StoreCategory> = emptyList(),
+    val addons: List<StoreAddon> = emptyList()
+)
+
+@Serializable
+data class StoreActionRequest(
+    val prompt: String,
+    val imageSize: String = "1024x1024"
+)
+
+@Serializable
+data class StoreArtifactRef(
+    val artifactId: String = "",
+    val thumbnailId: String = "",
+    val thumbnailUrl: String = "",
+    val mimeType: String = "",
+    val status: String = ""
+)
+
+@Serializable
+data class StoreActionResult(
+    val artifacts: List<StoreArtifactRef> = emptyList()
+)
+
+@Serializable
+data class StoreActionResponse(
+    val ok: Boolean = false,
+    val jobId: String? = null,
+    val requestId: String? = null,
+    val status: String = "",
+    val approvalRequired: Boolean = false,
+    val errorCode: String? = null,
+    val result: StoreActionResult? = null
+)
+
+@Serializable
+data class StoreGalleryResponse(
+    val ok: Boolean = true,
+    val addonId: String = "",
+    val items: List<StoreArtifactRef> = emptyList()
+)
+
 /** Body for POST /chat/stream — matches the desktop ChatRequest shape. */
 @Serializable
 data class ChatStreamRequest(

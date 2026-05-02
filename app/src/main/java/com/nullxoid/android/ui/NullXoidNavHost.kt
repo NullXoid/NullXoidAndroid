@@ -20,6 +20,7 @@ import com.nullxoid.android.ui.chat.ChatScreen
 import com.nullxoid.android.ui.health.HealthScreen
 import com.nullxoid.android.ui.onboarding.OnboardingScreen
 import com.nullxoid.android.ui.settings.SettingsScreen
+import com.nullxoid.android.ui.store.StoreScreen
 import com.nullxoid.android.ui.theme.NullXoidTheme
 
 object Routes {
@@ -29,6 +30,7 @@ object Routes {
     const val Chat = "chat"
     const val Settings = "settings"
     const val Health = "health"
+    const val Store = "store"
 }
 
 @Composable
@@ -122,6 +124,10 @@ fun NullXoidApp(
                             nav.navigate(Routes.Chat)
                         },
                         onRefresh = vm::refreshChats,
+                        onOpenStore = {
+                            vm.refreshStore()
+                            nav.navigate(Routes.Store)
+                        },
                         onOpenSettings = { nav.navigate(Routes.Settings) },
                         onOpenHealth = { nav.navigate(Routes.Health) },
                         onLogout = vm::logout
@@ -171,6 +177,14 @@ fun NullXoidApp(
                         state = state,
                         onBack = { nav.popBackStack() },
                         onRefresh = vm::refreshHealth
+                    )
+                }
+                composable(Routes.Store) {
+                    StoreScreen(
+                        state = state,
+                        onBack = { nav.popBackStack() },
+                        onRefresh = vm::refreshStore,
+                        onRunLocalImageStudio = vm::runLocalImageStudio
                     )
                 }
             }

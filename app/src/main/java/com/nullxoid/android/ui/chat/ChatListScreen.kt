@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -41,6 +42,7 @@ fun ChatListScreen(
     onOpenChat: (ChatRecord) -> Unit,
     onNewChat: () -> Unit,
     onRefresh: () -> Unit,
+    onOpenStore: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenHealth: () -> Unit,
     onLogout: () -> Unit
@@ -64,6 +66,10 @@ fun ChatListScreen(
                         modifier = Modifier.testTag("chat-list-health"),
                         onClick = onOpenHealth
                     ) { Icon(Icons.Default.Favorite, "health") }
+                    IconButton(
+                        modifier = Modifier.testTag("chat-list-store"),
+                        onClick = onOpenStore
+                    ) { Icon(Icons.Default.Storefront, "Store") }
                     IconButton(
                         modifier = Modifier.testTag("chat-list-settings"),
                         onClick = onOpenSettings

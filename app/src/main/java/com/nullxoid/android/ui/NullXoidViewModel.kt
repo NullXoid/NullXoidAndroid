@@ -19,6 +19,9 @@ import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.PasskeyCredentialRecord
 import com.nullxoid.android.data.model.PasskeyProviderStatus
+import com.nullxoid.android.data.model.StoreActionResponse
+import com.nullxoid.android.data.model.StoreCatalogResponse
+import com.nullxoid.android.data.model.StoreGalleryResponse
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.data.repo.NullXoidRepository
@@ -178,6 +181,10 @@ data class AppUiState(
     val passkeyProvider: PasskeyProviderStatus? = null,
     val passkeyCredentials: List<PasskeyCredentialRecord> = emptyList(),
     val passkeyLoading: Boolean = false,
+    val storeCatalog: StoreCatalogResponse = StoreCatalogResponse(),
+    val storeGallery: StoreGalleryResponse = StoreGalleryResponse(addonId = "local-image-studio"),
+    val storeAction: StoreActionResponse? = null,
+    val storeLoading: Boolean = false,
     val onboardingCompleted: Boolean = false,
     val currentAppVersionName: String = BuildConfig.VERSION_NAME,
     val currentAppVersionCode: Int = BuildConfig.VERSION_CODE
@@ -432,6 +439,61 @@ class NullXoidViewModel(
             runCatching { repo.health() }
                 .onSuccess { _state.value = _state.value.copy(health = it) }
                 .onFailure { t -> _state.value = _state.value.copy(error = t.message) }
+        }
+    }
+
+    fun refreshStore() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(storeLoading = true, error = null)
+            runCatching {
+                val catalog = repo.storeCatalog()
+                val gallery = repo.storeGallery("local-image-studio")
+                catalog to gallery
+            }.onSuccess { (catalog, gallery) ->
+                _state.value = _state.value.copy(
+                    storeLoading = false,
+                    storeCatalog = catalog,
+                    storeGallery = gallery
+                )
+            }.onFailure { t ->
+                _state.value = _state.value.copy(
+                    storeLoading = false,
+                    error = t.message ?: "Store refresh failed"
+                )
+            }
+        }
+    }
+
+    fun runLocalImageStudio(prompt: String, imageSize: String) {
+        val cleanPrompt = prompt.trim()
+        if (cleanPrompt.isBlank()) {
+            _state.value = _state.value.copy(error = "Prompt required")
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                storeLoading = true,
+                storeAction = StoreActionResponse(status = "pending_approval", approvalRequired = true),
+                error = null
+            )
+            runCatching {
+                repo.runStoreAction(
+                    addonId = "local-image-studio",
+                    action = "media.image.generate.local",
+                    prompt = cleanPrompt,
+                    imageSize = imageSize
+                )
+            }.onSuccess { result ->
+                _state.value = _state.value.copy(storeLoading = false, storeAction = result)
+                runCatching { repo.storeGallery("local-image-studio") }
+                    .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
+            }.onFailure { t ->
+                _state.value = _state.value.copy(
+                    storeLoading = false,
+                    storeAction = null,
+                    error = t.message ?: "Local Image Studio failed"
+                )
+            }
         }
     }
 

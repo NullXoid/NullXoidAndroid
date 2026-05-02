@@ -24,6 +24,10 @@ import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.OidcCompleteRequest
 import com.nullxoid.android.data.model.PasskeyCredentialsResponse
 import com.nullxoid.android.data.model.ProjectCreateRequest
+import com.nullxoid.android.data.model.StoreActionRequest
+import com.nullxoid.android.data.model.StoreActionResponse
+import com.nullxoid.android.data.model.StoreCatalogResponse
+import com.nullxoid.android.data.model.StoreGalleryResponse
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.Flow
@@ -222,6 +226,13 @@ class NullXoidRepository(
     suspend fun health(): HealthFeatures = api.healthFeatures()
 
     suspend fun clientManifest(): ClientManifest = api.clientManifest("android")
+
+    suspend fun storeCatalog(): StoreCatalogResponse = api.storeCatalog()
+
+    suspend fun storeGallery(addonId: String): StoreGalleryResponse = api.storeGallery(addonId)
+
+    suspend fun runStoreAction(addonId: String, action: String, prompt: String, imageSize: String): StoreActionResponse =
+        api.runStoreAction(addonId, action, StoreActionRequest(prompt = prompt, imageSize = imageSize))
 
     suspend fun importSavedChatRecoveryEnvelope(recoverySecret: String, recoveryBundle: JsonObject): Int {
         val auth = requireScopedAuth()

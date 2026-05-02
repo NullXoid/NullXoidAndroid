@@ -21,6 +21,10 @@ import com.nullxoid.android.data.model.ProjectCreateResponse
 import com.nullxoid.android.data.model.ProjectListResponse
 import com.nullxoid.android.data.model.ProjectSummary
 import com.nullxoid.android.data.model.RemoteSettings
+import com.nullxoid.android.data.model.StoreActionRequest
+import com.nullxoid.android.data.model.StoreActionResponse
+import com.nullxoid.android.data.model.StoreCatalogResponse
+import com.nullxoid.android.data.model.StoreGalleryResponse
 import com.nullxoid.android.data.model.WorkspaceListResponse
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -134,6 +138,16 @@ class NullXoidApi(
 
     suspend fun clientManifest(platform: String = "android"): ClientManifest =
         getJson("/api/client-manifest?platform=${urlEncode(platform)}")
+
+    // ---- Store ----------------------------------------------------------
+
+    suspend fun storeCatalog(): StoreCatalogResponse = getJson("/api/store/catalog")
+
+    suspend fun storeGallery(addonId: String): StoreGalleryResponse =
+        getJson("/api/store/addons/${urlEncode(addonId)}/gallery")
+
+    suspend fun runStoreAction(addonId: String, action: String, request: StoreActionRequest): StoreActionResponse =
+        sendJson("POST", "/api/store/addons/${urlEncode(addonId)}/actions/${urlEncode(action)}", request)
 
     // ---- Settings / Models ---------------------------------------------
 

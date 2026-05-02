@@ -10,6 +10,7 @@ import com.nullxoid.android.data.model.LoginRequest
 import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.ModelListResponse
 import com.nullxoid.android.data.model.RemoteSettings
+import com.nullxoid.android.data.model.StoreActionRequest
 import com.nullxoid.android.backend.engine.LlmEngine
 import com.nullxoid.android.backend.nullbridge.NullBridgeAdapter
 import com.nullxoid.android.backend.store.EmbeddedStore
@@ -45,6 +46,7 @@ fun Route.nullxoidRoutes(store: EmbeddedStore, engine: LlmEngine) {
     nullBridgeRoutes(store)
     modelRoutes(engine)
     settingsRoutes(engine)
+    storeRoutes()
     chatRoutes(store)
     chatStreamRoute(store, engine)
 }
@@ -221,6 +223,150 @@ private fun Route.settingsRoutes(engine: LlmEngine) {
         // Accept and echo the update; no persistence for v1.
         val patch = call.receive<JsonObject>()
         call.respond(defaults.copy(settings = patch))
+    }
+}
+
+private const val localImageStudioId = "local-image-studio"
+private const val localImageStudioAction = "media.image.generate.local"
+private const val localImageStudioCapability = "suite.media.image.generate"
+
+private fun storeCatalogJson(): JsonObject = buildJsonObject {
+    put("ok", true)
+    put(
+        "categories",
+        JsonArray(
+            listOf(
+                "productivity" to "Productivity",
+                "creative-workflows" to "Creative Workflows",
+                "automation" to "Automation",
+                "developer-tools" to "Developer Tools",
+                "operations" to "Operations",
+                "privacy-security" to "Privacy & Security",
+                "experiments" to "Experiments"
+            ).map { (id, label) ->
+                buildJsonObject {
+                    put("id", id)
+                    put("label", label)
+                }
+            }
+        )
+    )
+    put("addons", JsonArray(listOf(localImageStudioJson())))
+}
+
+private fun localImageStudioJson(): JsonObject = buildJsonObject {
+    put("id", localImageStudioId)
+    put("name", "Local Image Studio")
+    put("category", "creative-workflows")
+    put("categoryLabel", "Creative Workflows")
+    put("subcategory", "image-generation")
+    put("description", "Generate private local images through an approval-gated backend workflow.")
+    put("status", "alpha")
+    put("enabled", true)
+    put("visibility", "local-debug")
+    put("platforms", JsonArray(listOf("web", "android", "windows").map(::JsonPrimitive)))
+    put("capabilities", JsonArray(listOf(localImageStudioCapability).map(::JsonPrimitive)))
+    put("requiresApproval", true)
+    put(
+        "approvalRoute",
+        buildJsonObject {
+            put("title", "Approve image generation?")
+            put("summary", "Local Image Studio wants to generate an image.")
+            put("risk", "medium")
+            put("action", localImageStudioAction)
+        }
+    )
+    put("providerKinds", JsonArray(listOf("mock", "local-image-engine", "local-video-engine").map(::JsonPrimitive)))
+    put(
+        "permissions",
+        JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("kind", "approval")
+                    put("scope", "nullbridge")
+                },
+                buildJsonObject {
+                    put("kind", "artifact")
+                    put("scope", "private-generated-image")
+                }
+            )
+        )
+    )
+    put(
+        "routes",
+        buildJsonObject {
+            put("detail", "/api/store/addons/$localImageStudioId")
+            put("action", "/api/store/addons/$localImageStudioId/actions/$localImageStudioAction")
+            put("gallery", "/api/store/addons/$localImageStudioId/gallery")
+        }
+    )
+}
+
+private fun Route.storeRoutes() {
+    get("/api/store/catalog") { call.respond(storeCatalogJson()) }
+
+    get("/api/store/addons/{addonId}") {
+        if (call.parameters["addonId"] != localImageStudioId) {
+            call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "addon not found") })
+        } else {
+            call.respond(localImageStudioJson())
+        }
+    }
+
+    post("/api/store/addons/{addonId}/enable") {
+        if (call.parameters["addonId"] != localImageStudioId) {
+            call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "addon not found") })
+        } else {
+            call.respond(localImageStudioJson())
+        }
+    }
+
+    post("/api/store/addons/{addonId}/disable") {
+        if (call.parameters["addonId"] != localImageStudioId) {
+            call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "addon not found") })
+        } else {
+            call.respond(localImageStudioJson())
+        }
+    }
+
+    post("/api/store/addons/{addonId}/actions/{action}") {
+        val addonId = call.parameters["addonId"].orEmpty()
+        val action = call.parameters["action"].orEmpty()
+        val body = call.receive<StoreActionRequest>()
+        if (addonId != localImageStudioId || action != localImageStudioAction || body.prompt.isBlank()) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                buildJsonObject {
+                    put("ok", false)
+                    put("status", "failed")
+                    put("approvalRequired", false)
+                    put("errorCode", "CAPABILITY_NOT_SUPPORTED")
+                }
+            )
+        } else {
+            call.respond(
+                buildJsonObject {
+                    put("ok", true)
+                    put("requestId", "android-store-local-demo")
+                    put("status", "pending_approval")
+                    put("approvalRequired", true)
+                }
+            )
+        }
+    }
+
+    get("/api/store/addons/{addonId}/gallery") {
+        if (call.parameters["addonId"] != localImageStudioId) {
+            call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "addon not found") })
+        } else {
+            call.respond(
+                buildJsonObject {
+                    put("ok", true)
+                    put("addonId", localImageStudioId)
+                    put("items", JsonArray(emptyList()))
+                }
+            )
+        }
     }
 }
 
