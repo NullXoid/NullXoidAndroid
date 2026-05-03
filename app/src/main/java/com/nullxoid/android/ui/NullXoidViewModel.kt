@@ -58,6 +58,22 @@ private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
 private const val OIDC_REDIRECT_URI = "nullxoid://auth/oidc/callback"
 private val STORE_TERMINAL_STATUSES = setOf("completed", "denied", "expired", "failed", "cancelled")
 
+private data class StoreRefreshResult(
+    val catalog: StoreCatalogResponse,
+    val gallery: StoreGalleryResponse,
+    val activeJob: StoreActionResponse?,
+    val activeJobId: String,
+    val activeAddonId: String
+)
+
+private data class StoreGalleriesRefreshResult(
+    val catalog: StoreCatalogResponse,
+    val items: List<StoreArtifactRef>,
+    val activeJob: StoreActionResponse?,
+    val activeJobId: String,
+    val activeAddonId: String
+)
+
 internal fun parseSavedChatRecoveryImport(json: Json, raw: String): JsonObject {
     val bundle = json.parseToJsonElement(raw.trim()).jsonObject
     if (bundle["p"]?.jsonPrimitive?.contentOrNull != "nx.aik1") return bundle
@@ -475,23 +491,27 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(storeLoading = true, error = null)
             runCatching {
                 val catalog = repo.storeCatalog()
-                val galleryAddonId = _state.value.activeStoreAddonId.ifBlank { "local-image-studio" }
-                val activeJob = _state.value.activeStoreJobId
+                val activeJobId = _state.value.activeStoreJobId
+                    .ifBlank { settingsStore.activeStoreJobId.first() }
+                val activeAddonId = _state.value.activeStoreAddonId
+                    .ifBlank { settingsStore.activeStoreAddonId.first() }
+                val galleryAddonId = activeAddonId.ifBlank { "local-image-studio" }
+                val activeJob = activeJobId
                     .takeIf { it.isNotBlank() }
                     ?.let { jobId -> runCatching { repo.storeJob(jobId) }.getOrNull() }
-                val gallery = repo.storeGallery(galleryAddonId)
-                Triple(catalog, gallery, activeJob)
-            }.onSuccess { (catalog, gallery, activeJob) ->
+                StoreRefreshResult(catalog, repo.storeGallery(galleryAddonId), activeJob, activeJobId, activeAddonId)
+            }.onSuccess { result ->
+                val activeJob = result.activeJob
                 if (activeJob?.status in STORE_TERMINAL_STATUSES) {
                     settingsStore.clearActiveStoreJob()
                 }
                 _state.value = _state.value.copy(
                     storeLoading = false,
-                    storeCatalog = catalog,
-                    storeGallery = gallery,
+                    storeCatalog = result.catalog,
+                    storeGallery = result.gallery,
                     storeAction = activeJob ?: _state.value.storeAction,
-                    activeStoreJobId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else _state.value.activeStoreJobId,
-                    activeStoreAddonId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else _state.value.activeStoreAddonId
+                    activeStoreJobId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeJobId,
+                    activeStoreAddonId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeAddonId
                 )
             }.onFailure { t ->
                 _state.value = _state.value.copy(
@@ -516,18 +536,32 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(storeLoading = true, error = null)
             runCatching {
                 val catalog = if (_state.value.storeCatalog.addons.isEmpty()) repo.storeCatalog() else _state.value.storeCatalog
+                val activeJobId = _state.value.activeStoreJobId
+                    .ifBlank { settingsStore.activeStoreJobId.first() }
+                val activeAddonId = _state.value.activeStoreAddonId
+                    .ifBlank { settingsStore.activeStoreAddonId.first() }
+                val activeJob = activeJobId
+                    .takeIf { it.isNotBlank() }
+                    ?.let { jobId -> runCatching { repo.storeJob(jobId) }.getOrNull() }
                 val creativeAddons = catalog.addons.filter {
                     it.id in setOf("local-image-studio", "local-video-studio", "local-3d-studio")
                 }
                 val galleries = creativeAddons.flatMap { addon ->
                     runCatching { repo.storeGallery(addon.id).items }.getOrDefault(emptyList())
                 }
-                catalog to galleries
-            }.onSuccess { (catalog, items) ->
+                StoreGalleriesRefreshResult(catalog, galleries, activeJob, activeJobId, activeAddonId)
+            }.onSuccess { result ->
+                val activeJob = result.activeJob
+                if (activeJob?.status in STORE_TERMINAL_STATUSES) {
+                    settingsStore.clearActiveStoreJob()
+                }
                 _state.value = _state.value.copy(
                     storeLoading = false,
-                    storeCatalog = catalog,
-                    storeGalleryAll = items
+                    storeCatalog = result.catalog,
+                    storeGalleryAll = result.items,
+                    storeAction = activeJob ?: _state.value.storeAction,
+                    activeStoreJobId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeJobId,
+                    activeStoreAddonId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeAddonId
                 )
             }.onFailure { t ->
                 _state.value = _state.value.copy(
@@ -629,7 +663,14 @@ class NullXoidViewModel(
     }
 
     fun resumeStoreJobPolling() {
-        resumeActiveStoreJob()
+        viewModelScope.launch {
+            val jobId = _state.value.activeStoreJobId.ifBlank { settingsStore.activeStoreJobId.first() }
+            val addonId = _state.value.activeStoreAddonId.ifBlank { settingsStore.activeStoreAddonId.first() }
+            if (jobId.isNotBlank() && addonId.isNotBlank()) {
+                _state.value = _state.value.copy(activeStoreJobId = jobId, activeStoreAddonId = addonId)
+                startStoreJobPolling(jobId, addonId)
+            }
+        }
     }
 
     private fun startStoreJobPolling(storeJobId: String, addonId: String, initialPollAfterMs: Int = 1500) {
