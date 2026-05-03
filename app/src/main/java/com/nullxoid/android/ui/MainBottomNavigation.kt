@@ -2,7 +2,7 @@ package com.nullxoid.android.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -14,28 +14,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 
 enum class MainTab {
-    Home,
     Create,
     Gallery,
+    Ask,
     Settings
 }
 
 @Composable
 fun MainBottomNavigation(
     selected: MainTab,
-    onOpenHome: () -> Unit,
     onOpenCreate: () -> Unit,
     onOpenGallery: () -> Unit,
+    onOpenAsk: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     NavigationBar(modifier = Modifier.testTag("main-bottom-nav")) {
-        NavigationBarItem(
-            selected = selected == MainTab.Home,
-            onClick = onOpenHome,
-            icon = { Icon(Icons.Default.Home, "Home") },
-            label = { Text("Home") },
-            modifier = Modifier.testTag("bottom-nav-home")
-        )
         NavigationBarItem(
             selected = selected == MainTab.Create,
             onClick = onOpenCreate,
@@ -49,6 +42,13 @@ fun MainBottomNavigation(
             icon = { Icon(Icons.Default.PhotoLibrary, "Gallery") },
             label = { Text("Gallery") },
             modifier = Modifier.testTag("bottom-nav-gallery")
+        )
+        NavigationBarItem(
+            selected = selected == MainTab.Ask,
+            onClick = onOpenAsk,
+            icon = { Icon(Icons.Default.Favorite, "Ask") },
+            label = { Text("Ask") },
+            modifier = Modifier.testTag("bottom-nav-ask")
         )
         NavigationBarItem(
             selected = selected == MainTab.Settings,

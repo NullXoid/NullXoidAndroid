@@ -14,14 +14,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -57,7 +53,6 @@ import com.nullxoid.android.ui.passkeyEnrollmentStatusText
 @Composable
 fun SettingsScreen(
     state: AppUiState,
-    onBack: () -> Unit,
     onSave: (String) -> Unit,
     onSelectModel: (String) -> Unit,
     onRefreshModels: () -> Unit,
@@ -74,8 +69,8 @@ fun SettingsScreen(
     onImportSavedChatRecovery: (String, String) -> Unit,
     onRunOnboarding: () -> Unit,
     onLogout: () -> Unit,
-    onOpenHome: () -> Unit,
     onOpenCreate: () -> Unit,
+    onOpenAsk: () -> Unit,
     onOpenGallery: () -> Unit
 ) {
     val clipboard = LocalClipboardManager.current
@@ -117,21 +112,15 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(
-                        modifier = Modifier.testTag("settings-back"),
-                        onClick = onBack
-                    ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                }
+                title = { Text("Settings") }
             )
         },
         bottomBar = {
             MainBottomNavigation(
                 selected = MainTab.Settings,
-                onOpenHome = onOpenHome,
                 onOpenCreate = onOpenCreate,
                 onOpenGallery = onOpenGallery,
+                onOpenAsk = onOpenAsk,
                 onOpenSettings = {}
             )
         }
@@ -395,31 +384,6 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(24.dp))
-            Text("Advanced", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Model", style = MaterialTheme.typography.titleSmall)
-                AssistChip(onClick = onRefreshModels, label = { Text("Refresh") })
-            }
-            Spacer(Modifier.height(8.dp))
-            if (state.models.isEmpty()) {
-                Text("No models loaded yet.", style = MaterialTheme.typography.bodySmall)
-            } else {
-                state.models.forEach { model ->
-                    FilterChip(
-                        selected = state.selectedModel == model.id,
-                        onClick = { onSelectModel(model.id) },
-                        label = { Text(model.name ?: model.id) }
-                    )
-                    Spacer(Modifier.height(4.dp))
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
             Text("App update", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Text("Release channel", style = MaterialTheme.typography.titleSmall)
@@ -494,8 +458,33 @@ fun SettingsScreen(
                 ) { Text(if (state.installingUpdate) "Installing" else "Install") }
             }
 
-            Spacer(Modifier.height(32.dp))
-            Text("Advanced backend", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(24.dp))
+            Text("Advanced", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Model", style = MaterialTheme.typography.titleSmall)
+                AssistChip(onClick = onRefreshModels, label = { Text("Refresh") })
+            }
+            Spacer(Modifier.height(8.dp))
+            if (state.models.isEmpty()) {
+                Text("No models loaded yet.", style = MaterialTheme.typography.bodySmall)
+            } else {
+                state.models.forEach { model ->
+                    FilterChip(
+                        selected = state.selectedModel == model.id,
+                        onClick = { onSelectModel(model.id) },
+                        label = { Text(model.name ?: model.id) }
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            Text("Advanced backend", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),

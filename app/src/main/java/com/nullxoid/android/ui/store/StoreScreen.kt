@@ -14,14 +14,13 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AssistChip
@@ -72,10 +71,9 @@ import com.nullxoid.android.ui.MainTab
 fun StoreScreen(
     state: AppUiState,
     initialAddonId: String,
-    onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onOpenHome: () -> Unit,
     onOpenGallery: () -> Unit,
+    onOpenAsk: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectAddon: (String) -> Unit,
     onRunStoreAddon: (String, String, String, String, String, String, Int, String) -> Unit,
@@ -134,11 +132,6 @@ fun StoreScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Create") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
                 actions = {
                     IconButton(
                         modifier = Modifier.testTag("store-refresh"),
@@ -150,9 +143,9 @@ fun StoreScreen(
         bottomBar = {
             MainBottomNavigation(
                 selected = MainTab.Create,
-                onOpenHome = onOpenHome,
                 onOpenCreate = {},
                 onOpenGallery = onOpenGallery,
+                onOpenAsk = onOpenAsk,
                 onOpenSettings = onOpenSettings
             )
         }
@@ -160,6 +153,8 @@ fun StoreScreen(
         LazyColumn(
             modifier = Modifier
                 .padding(inner)
+                .navigationBarsPadding()
+                .imePadding()
                 .fillMaxSize()
                 .testTag("store-screen"),
             contentPadding = PaddingValues(16.dp),
@@ -167,12 +162,12 @@ fun StoreScreen(
         ) {
             item {
                 Text(
-                    "Creative Workflows",
+                    "Create",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    "Choose a media type, request approval, then view the private result.",
+                    "Private media through approval-gated workflows.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -182,8 +177,6 @@ fun StoreScreen(
                 item { EmptyStoreCard(state.storeLoading) }
             } else {
                 item {
-                    Text("1. Choose", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(8.dp))
                     StoreMediaSelector(
                         addons = addons,
                         selectedAddonId = selectedAddon?.id.orEmpty(),
@@ -230,29 +223,28 @@ fun StoreScreen(
                 }
                 item {
                     Text(
-                        "Gallery",
+                        "Latest result",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                if (state.storeGallery.items.isEmpty()) {
-                    item {
+                item {
+                    val latest = state.storeGallery.items.firstOrNull()
+                    if (latest == null) {
                         Text(
-                            "No ${selectedAddon?.name ?: "Create"} artifacts yet.",
+                            "No recent result yet. Gallery will show your private media after generation.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                } else {
-                    itemsIndexed(state.storeGallery.items, key = { _, item -> item.artifactId }) { index, item ->
+                    } else {
                         StoreGalleryCard(
-                            item = item,
-                            title = safeArtifactTitle(item, index),
-                            previewBytes = state.storePreviewBytes[item.artifactId],
+                            item = latest,
+                            title = safeArtifactTitle(latest, 0),
+                            previewBytes = state.storePreviewBytes[latest.artifactId],
                             onLoadPreview = onLoadPreview,
-                            onView = { onViewArtifact(item) },
-                            onSave = { onSaveArtifact(item.artifactId, item.mimeType) },
-                            onShare = { onShareArtifact(item.artifactId, item.mimeType) }
+                            onView = { onViewArtifact(latest) },
+                            onSave = { onSaveArtifact(latest.artifactId, latest.mimeType) },
+                            onShare = { onShareArtifact(latest.artifactId, latest.mimeType) }
                         )
                     }
                 }
@@ -282,7 +274,7 @@ fun StoreScreen(
 private fun EmptyStoreCard(loading: Boolean) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text("Creative Workflows add-ons are unavailable.")
+            Text("Create options are unavailable.")
             if (loading) {
                 Spacer(Modifier.height(8.dp))
                 Text("Loading catalog...", style = MaterialTheme.typography.bodySmall)
@@ -352,8 +344,20 @@ private fun StoreAddonPanel(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("2. Configure", style = MaterialTheme.typography.titleMedium)
-            Text(addon?.name ?: "Creative Workflow", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                when (mediaKind) {
+                    "video" -> "Video"
+                    "3d" -> "3D"
+                    else -> "Image"
+                },
+                style = MaterialTheme.typography.headlineSmall
+            )
+            Text(
+                "Creative Workflows",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(addon?.name ?: "Creative Workflow", style = MaterialTheme.typography.titleSmall)
             Text(
                 addon?.description.orEmpty(),
                 style = MaterialTheme.typography.bodySmall,

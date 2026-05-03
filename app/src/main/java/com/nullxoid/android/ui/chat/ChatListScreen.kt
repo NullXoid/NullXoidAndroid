@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,9 +43,9 @@ fun ChatListScreen(
     onOpenChat: (ChatRecord) -> Unit,
     onNewChat: () -> Unit,
     onRefresh: () -> Unit,
-    onOpenHome: () -> Unit,
     onOpenCreate: () -> Unit,
     onOpenGallery: () -> Unit,
+    onOpenAsk: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenHealth: () -> Unit
 ) {
@@ -53,8 +55,7 @@ fun ChatListScreen(
                 title = {
                     Column {
                         Text("Ask EchoLabs")
-                        val who = state.auth.displayName ?: state.auth.username ?: "signed in"
-                        Text("Recent conversations - $who", style = MaterialTheme.typography.labelSmall)
+                        Text("Recent conversations", style = MaterialTheme.typography.labelSmall)
                     }
                 },
                 actions = {
@@ -71,10 +72,10 @@ fun ChatListScreen(
         },
         bottomBar = {
             MainBottomNavigation(
-                selected = MainTab.Home,
-                onOpenHome = onOpenHome,
+                selected = MainTab.Ask,
                 onOpenCreate = onOpenCreate,
                 onOpenGallery = onOpenGallery,
+                onOpenAsk = onOpenAsk,
                 onOpenSettings = onOpenSettings
             )
         },
@@ -90,6 +91,8 @@ fun ChatListScreen(
             onRefresh = onRefresh,
             modifier = Modifier
                 .padding(inner)
+                .navigationBarsPadding()
+                .imePadding()
                 .fillMaxSize()
         ) {
             Column(

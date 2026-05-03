@@ -2,13 +2,17 @@ package com.nullxoid.android.ui.store
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +20,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -30,8 +38,8 @@ import com.nullxoid.android.ui.MainTab
 fun GalleryScreen(
     state: AppUiState,
     onRefresh: () -> Unit,
-    onOpenHome: () -> Unit,
     onOpenCreate: () -> Unit,
+    onOpenAsk: () -> Unit,
     onOpenSettings: () -> Unit,
     onSaveArtifact: (String, String) -> Unit,
     onShareArtifact: (String, String) -> Unit,
@@ -40,6 +48,8 @@ fun GalleryScreen(
     onCloseViewer: () -> Unit
 ) {
     val items = state.storeGalleryAll.ifEmpty { state.storeGallery.items }
+    var selectedFilter by remember { mutableStateOf("all") }
+    val visibleItems = items.filter { galleryFilterMatches(selectedFilter, it) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -55,9 +65,9 @@ fun GalleryScreen(
         bottomBar = {
             MainBottomNavigation(
                 selected = MainTab.Gallery,
-                onOpenHome = onOpenHome,
                 onOpenCreate = onOpenCreate,
                 onOpenGallery = {},
+                onOpenAsk = onOpenAsk,
                 onOpenSettings = onOpenSettings
             )
         }
@@ -65,6 +75,8 @@ fun GalleryScreen(
         LazyColumn(
             modifier = Modifier
                 .padding(inner)
+                .navigationBarsPadding()
+                .imePadding()
                 .fillMaxSize()
                 .testTag("gallery-screen"),
             contentPadding = PaddingValues(16.dp),
@@ -78,15 +90,36 @@ fun GalleryScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (items.isEmpty()) {
+            if (items.isNotEmpty()) {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            "all" to "All",
+                            "image" to "Images",
+                            "video" to "Videos",
+                            "3d" to "3D"
+                        ).forEach { (id, label) ->
+                            FilterChip(
+                                selected = selectedFilter == id,
+                                onClick = { selectedFilter = id },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
+                }
+            }
+            if (visibleItems.isEmpty()) {
                 item {
                     Text(
-                        "No Create media yet. Generate an image in Creative Workflows first.",
+                        if (items.isEmpty())
+                            "No Create media yet. Generate an image from Create first."
+                        else
+                            "No media matches this filter yet.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
             } else {
-                itemsIndexed(items, key = { _, item -> item.artifactId }) { index, item ->
+                itemsIndexed(visibleItems, key = { _, item -> item.artifactId }) { index, item ->
                     StoreGalleryCard(
                         item = item,
                         title = safeArtifactTitle(item, index),
@@ -116,3 +149,11 @@ fun GalleryScreen(
         )
     }
 }
+
+private fun galleryFilterMatches(filter: String, item: StoreArtifactRef): Boolean =
+    when (filter) {
+        "image" -> item.mimeType.startsWith("image/")
+        "video" -> item.mimeType.startsWith("video/")
+        "3d" -> item.mimeType.startsWith("model/") || item.format in setOf("glb", "gltf")
+        else -> true
+    }
