@@ -1,8 +1,11 @@
 package com.nullxoid.android.ui
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -29,6 +32,7 @@ import com.nullxoid.android.data.update.AppUpdateChecker
 import com.nullxoid.android.data.update.AppUpdateInfo
 import com.nullxoid.android.data.update.AppUpdateInstaller
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +40,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -47,6 +52,7 @@ import java.time.Instant
 
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
 private const val OIDC_REDIRECT_URI = "nullxoid://auth/oidc/callback"
+private val STORE_TERMINAL_STATUSES = setOf("completed", "denied", "expired", "failed", "cancelled")
 
 internal fun parseSavedChatRecoveryImport(json: Json, raw: String): JsonObject {
     val bundle = json.parseToJsonElement(raw.trim()).jsonObject
@@ -185,6 +191,9 @@ data class AppUiState(
     val storeGallery: StoreGalleryResponse = StoreGalleryResponse(addonId = "local-image-studio"),
     val storeAction: StoreActionResponse? = null,
     val storeLoading: Boolean = false,
+    val activeStoreJobId: String = "",
+    val activeStoreAddonId: String = "",
+    val storeSaveStatus: String = "",
     val onboardingCompleted: Boolean = false,
     val currentAppVersionName: String = BuildConfig.VERSION_NAME,
     val currentAppVersionCode: Int = BuildConfig.VERSION_CODE
@@ -200,6 +209,7 @@ class NullXoidViewModel(
     val state: StateFlow<AppUiState> = _state.asStateFlow()
 
     private var streamJob: Job? = null
+    private var storePollJob: Job? = null
     private var updateCheckJob: Job? = null
     private var pendingOidcLaunch: OidcLaunch? = null
     private val importJson = Json { ignoreUnknownKeys = true }
@@ -219,6 +229,8 @@ class NullXoidViewModel(
                 .getOrDefault(SettingsStore.UPDATE_SOURCE_AUTO)
             val onboardingCompleted = runCatching { settingsStore.onboardingCompleted.first() }
                 .getOrDefault(false)
+            val activeStoreJobId = runCatching { settingsStore.activeStoreJobId.first() }.getOrDefault("")
+            val activeStoreAddonId = runCatching { settingsStore.activeStoreAddonId.first() }.getOrDefault("")
             if (embedded) ensureBackendRunning()
             val manifest = runCatching { repo.clientManifest() }.getOrNull()
             val auth = runCatching { repo.bootstrap() }.getOrElse { AuthState() }
@@ -239,9 +251,14 @@ class NullXoidViewModel(
                 clientManifest = manifest,
                 auth = auth,
                 backendUrl = url,
+                activeStoreJobId = activeStoreJobId,
+                activeStoreAddonId = activeStoreAddonId,
                 selectedModel = repo.selectedModel()
             )
-            if (auth.authenticated) refreshPostLogin()
+            if (auth.authenticated) {
+                refreshPostLogin()
+                resumeActiveStoreJob()
+            }
             checkForUpdateSilently()
             startPeriodicUpdateChecks()
         }
@@ -364,6 +381,7 @@ class NullXoidViewModel(
     fun logout() {
         viewModelScope.launch {
             streamJob?.cancel()
+            storePollJob?.cancel()
             repo.logout()
             val current = _state.value
             _state.value = AppUiState(
@@ -447,7 +465,8 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(storeLoading = true, error = null)
             runCatching {
                 val catalog = repo.storeCatalog()
-                val gallery = repo.storeGallery("local-image-studio")
+                val galleryAddonId = _state.value.activeStoreAddonId.ifBlank { "local-image-studio" }
+                val gallery = repo.storeGallery(galleryAddonId)
                 catalog to gallery
             }.onSuccess { (catalog, gallery) ->
                 _state.value = _state.value.copy(
@@ -495,9 +514,22 @@ class NullXoidViewModel(
                     capability = capability
                 )
             }.onSuccess { result ->
-                _state.value = _state.value.copy(storeLoading = false, storeAction = result)
-                runCatching { repo.storeGallery(addonId) }
-                    .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
+                val storeJobId = result.storeJobId ?: result.jobId.orEmpty()
+                if (storeJobId.isNotBlank()) {
+                    settingsStore.setActiveStoreJob(storeJobId, addonId)
+                    _state.value = _state.value.copy(
+                        storeLoading = false,
+                        storeAction = result,
+                        activeStoreJobId = storeJobId,
+                        activeStoreAddonId = addonId,
+                        storeSaveStatus = ""
+                    )
+                    startStoreJobPolling(storeJobId, addonId, result.pollAfterMs)
+                } else {
+                    _state.value = _state.value.copy(storeLoading = false, storeAction = result)
+                    runCatching { repo.storeGallery(addonId) }
+                        .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
+                }
             }.onFailure { t ->
                 _state.value = _state.value.copy(
                     storeLoading = false,
@@ -507,6 +539,85 @@ class NullXoidViewModel(
             }
         }
     }
+
+    private fun resumeActiveStoreJob() {
+        val jobId = _state.value.activeStoreJobId
+        val addonId = _state.value.activeStoreAddonId
+        if (jobId.isNotBlank() && addonId.isNotBlank()) {
+            startStoreJobPolling(jobId, addonId)
+        }
+    }
+
+    private fun startStoreJobPolling(storeJobId: String, addonId: String, initialPollAfterMs: Int = 1500) {
+        storePollJob?.cancel()
+        storePollJob = viewModelScope.launch {
+            var pollAfterMs = initialPollAfterMs.coerceAtLeast(500)
+            while (true) {
+                delay(pollAfterMs.toLong())
+                val result = runCatching { repo.storeJob(storeJobId) }.getOrElse { t ->
+                    _state.value = _state.value.copy(error = t.message ?: "Store job polling failed")
+                    return@launch
+                }
+                _state.value = _state.value.copy(
+                    storeAction = result,
+                    storeLoading = result.status !in STORE_TERMINAL_STATUSES,
+                    activeStoreJobId = storeJobId,
+                    activeStoreAddonId = addonId
+                )
+                pollAfterMs = result.pollAfterMs.coerceAtLeast(500)
+                if (result.status in STORE_TERMINAL_STATUSES) {
+                    runCatching { repo.storeGallery(addonId) }
+                        .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
+                    if (result.status == "completed") {
+                        settingsStore.clearActiveStoreJob()
+                        _state.value = _state.value.copy(activeStoreJobId = "", activeStoreAddonId = "")
+                    }
+                    break
+                }
+            }
+        }
+    }
+
+    fun saveStoreArtifactToDevice(artifactId: String, mimeType: String) {
+        if (artifactId.isBlank()) {
+            _state.value = _state.value.copy(storeSaveStatus = "No artifact selected")
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(storeSaveStatus = "Saving artifact...")
+            runCatching {
+                val bytes = repo.storeArtifactBytes(artifactId)
+                saveMediaBytesToDevice(artifactId, mimeType, bytes)
+            }.onSuccess { uri ->
+                _state.value = _state.value.copy(storeSaveStatus = "Saved to device: $uri")
+            }.onFailure { t ->
+                _state.value = _state.value.copy(storeSaveStatus = t.message ?: "Save failed")
+            }
+        }
+    }
+
+    private suspend fun saveMediaBytesToDevice(artifactId: String, mimeType: String, bytes: ByteArray): Uri =
+        withContext(Dispatchers.IO) {
+            val isVideo = mimeType.startsWith("video/")
+            val extension = when {
+                mimeType == "video/webm" -> "webm"
+                mimeType.startsWith("video/") -> "mp4"
+                mimeType == "image/jpeg" -> "jpg"
+                else -> "png"
+            }
+            val collection = if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            val relativePath = if (isVideo) Environment.DIRECTORY_MOVIES + "/EchoLabs" else Environment.DIRECTORY_PICTURES + "/EchoLabs"
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, "echolabs-$artifactId.$extension")
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType.ifBlank { if (isVideo) "video/mp4" else "image/png" })
+                put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+            }
+            val resolver = appContext.contentResolver
+            val uri = resolver.insert(collection, values) ?: error("Could not create device media item")
+            resolver.openOutputStream(uri)?.use { output -> output.write(bytes) }
+                ?: error("Could not open device media item")
+            uri
+        }
 
     fun refreshPasskeys() {
         if (!_state.value.auth.authenticated) {

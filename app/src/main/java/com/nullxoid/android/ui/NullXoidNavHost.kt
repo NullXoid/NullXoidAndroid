@@ -184,7 +184,8 @@ fun NullXoidApp(
                         state = state,
                         onBack = { nav.popBackStack() },
                         onRefresh = vm::refreshStore,
-                        onRunStoreAddon = vm::runStoreAddon
+                        onRunStoreAddon = vm::runStoreAddon,
+                        onSaveArtifact = vm::saveStoreArtifactToDevice
                     )
                 }
             }

@@ -45,7 +45,8 @@ fun StoreScreen(
     state: AppUiState,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onRunStoreAddon: (String, String, String, String, String) -> Unit
+    onRunStoreAddon: (String, String, String, String, String) -> Unit,
+    onSaveArtifact: (String, String) -> Unit
 ) {
     val addons = state.storeCatalog.addons.filter { it.category == "creative-workflows" || it.id in creativeWorkflowAddonIds }
     var selectedAddonId by remember { mutableStateOf("local-image-studio") }
@@ -120,6 +121,7 @@ fun StoreScreen(
                         loading = state.storeLoading,
                         status = state.storeAction?.status,
                         errorCode = state.storeAction?.errorCode,
+                        storeJobId = state.storeAction?.storeJobId ?: state.storeAction?.jobId,
                         onPromptChange = { prompt = it },
                         onImageSizeChange = { imageSize = it },
                         onRun = {
@@ -161,8 +163,16 @@ fun StoreScreen(
                                 )
                                 Text(item.mimeType, style = MaterialTheme.typography.labelSmall)
                                 Text(item.status, style = MaterialTheme.typography.labelSmall)
+                                Button(onClick = { onSaveArtifact(item.artifactId, item.mimeType) }) {
+                                    Text("Save to device")
+                                }
                             }
                         }
+                    }
+                }
+                if (state.storeSaveStatus.isNotBlank()) {
+                    item {
+                        Text(state.storeSaveStatus, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -209,6 +219,7 @@ private fun StoreAddonPanel(
     loading: Boolean,
     status: String?,
     errorCode: String?,
+    storeJobId: String?,
     onPromptChange: (String) -> Unit,
     onImageSizeChange: (String) -> Unit,
     onRun: () -> Unit
@@ -252,6 +263,12 @@ private fun StoreAddonPanel(
                 else -> "Result: ready"
             }
             Text(statusText, style = MaterialTheme.typography.bodyMedium)
+            if (!storeJobId.isNullOrBlank()) {
+                Text("Job: $storeJobId", style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (status.orEmpty() in setOf("pending_approval", "approved", "queued_connector", "running_provider", "uploading_artifact")) {
+                Text("Keep this screen open or return after approving in NullBridge; NullXoid will resume polling.", style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

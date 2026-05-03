@@ -22,6 +22,8 @@ class SettingsStore(private val context: Context) {
     private val ollamaModelKey = stringPreferencesKey("ollama_model")
     private val updateSourceKey = stringPreferencesKey("update_source")
     private val onboardingCompletedKey = booleanPreferencesKey("onboarding_completed")
+    private val activeStoreJobIdKey = stringPreferencesKey("active_store_job_id")
+    private val activeStoreAddonIdKey = stringPreferencesKey("active_store_addon_id")
 
     val backendUrl: Flow<String> = context.settingsDataStore.data.map {
         it[backendUrlKey] ?: DEFAULT_BACKEND_URL
@@ -55,6 +57,14 @@ class SettingsStore(private val context: Context) {
         it[onboardingCompletedKey] ?: false
     }
 
+    val activeStoreJobId: Flow<String> = context.settingsDataStore.data.map {
+        it[activeStoreJobIdKey] ?: ""
+    }
+
+    val activeStoreAddonId: Flow<String> = context.settingsDataStore.data.map {
+        it[activeStoreAddonIdKey] ?: ""
+    }
+
     suspend fun setBackendUrl(url: String) {
         context.settingsDataStore.edit { it[backendUrlKey] = BackendEndpoint.normalize(url) }
     }
@@ -85,6 +95,20 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setOnboardingCompleted(completed: Boolean) {
         context.settingsDataStore.edit { it[onboardingCompletedKey] = completed }
+    }
+
+    suspend fun setActiveStoreJob(jobId: String, addonId: String) {
+        context.settingsDataStore.edit {
+            it[activeStoreJobIdKey] = jobId
+            it[activeStoreAddonIdKey] = addonId
+        }
+    }
+
+    suspend fun clearActiveStoreJob() {
+        context.settingsDataStore.edit {
+            it.remove(activeStoreJobIdKey)
+            it.remove(activeStoreAddonIdKey)
+        }
     }
 
     companion object {

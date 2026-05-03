@@ -231,6 +231,10 @@ class NullXoidRepository(
 
     suspend fun storeGallery(addonId: String): StoreGalleryResponse = api.storeGallery(addonId)
 
+    suspend fun storeJob(storeJobId: String): StoreActionResponse = api.storeJob(storeJobId)
+
+    suspend fun storeArtifactBytes(artifactId: String): ByteArray = api.getBytes("/artifacts/$artifactId")
+
     suspend fun runStoreAction(
         addonId: String,
         action: String,
@@ -238,7 +242,8 @@ class NullXoidRepository(
         imageSize: String,
         capability: String = "",
         durationMs: Int = 4000,
-        format: String = "glb"
+        format: String = "glb",
+        jobType: String = ""
     ): StoreActionResponse =
         api.runStoreAction(
             addonId,
@@ -249,7 +254,9 @@ class NullXoidRepository(
                 videoSize = imageSize,
                 durationMs = durationMs,
                 format = format,
-                capability = capability
+                capability = capability,
+                jobType = jobType,
+                waitForApproval = false
             )
         )
 

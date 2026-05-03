@@ -338,7 +338,9 @@ data class StoreActionRequest(
     val videoSize: String = "1024x1024",
     val durationMs: Int = 4000,
     val format: String = "glb",
-    val capability: String = ""
+    val capability: String = "",
+    val jobType: String = "",
+    val waitForApproval: Boolean = false
 )
 
 @Serializable
@@ -363,11 +365,24 @@ data class StoreActionResult(
 @Serializable
 data class StoreActionResponse(
     val ok: Boolean = false,
+    val storeJobId: String? = null,
     val jobId: String? = null,
+    val providerJobId: String? = null,
     val requestId: String? = null,
+    val addonId: String = "",
+    val mediaKind: String = "",
     val status: String = "",
     val approvalRequired: Boolean = false,
+    val pollAfterMs: Int = 1500,
     val errorCode: String? = null,
+    val artifacts: List<StoreArtifactRef> = emptyList(),
+    val artifactId: String = "",
+    val thumbnailUrl: String = "",
+    val previewUrl: String = "",
+    val mimeType: String = "",
+    val durationMs: Int = 0,
+    val createdAt: String = "",
+    val updatedAt: String = "",
     val result: StoreActionResult? = null
 )
 

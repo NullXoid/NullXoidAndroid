@@ -67,6 +67,15 @@ class NullXoidApi(
             }
         }
 
+    suspend fun getBytes(path: String): ByteArray =
+        withContext(Dispatchers.IO) {
+            val req = Request.Builder().url(url(path)).get().build()
+            HttpClient.okHttp.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) throw ApiException(resp.code, resp.body?.string().orEmpty())
+                resp.body?.bytes() ?: ByteArray(0)
+            }
+        }
+
     private suspend inline fun <reified B, reified T> sendJson(
         method: String,
         path: String,
@@ -145,6 +154,9 @@ class NullXoidApi(
 
     suspend fun storeGallery(addonId: String): StoreGalleryResponse =
         getJson("/api/store/addons/${urlEncode(addonId)}/gallery")
+
+    suspend fun storeJob(storeJobId: String): StoreActionResponse =
+        getJson("/api/store/jobs/${urlEncode(storeJobId)}")
 
     suspend fun runStoreAction(addonId: String, action: String, request: StoreActionRequest): StoreActionResponse =
         sendJson("POST", "/api/store/addons/${urlEncode(addonId)}/actions/${urlEncode(action)}", request)
