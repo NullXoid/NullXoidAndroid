@@ -30,8 +30,8 @@ import com.nullxoid.android.ui.MainTab
 fun GalleryScreen(
     state: AppUiState,
     onRefresh: () -> Unit,
-    onOpenChats: () -> Unit,
-    onOpenStore: () -> Unit,
+    onOpenHome: () -> Unit,
+    onOpenCreate: () -> Unit,
     onOpenSettings: () -> Unit,
     onSaveArtifact: (String, String) -> Unit,
     onShareArtifact: (String, String) -> Unit,
@@ -55,8 +55,8 @@ fun GalleryScreen(
         bottomBar = {
             MainBottomNavigation(
                 selected = MainTab.Gallery,
-                onOpenChats = onOpenChats,
-                onOpenStore = onOpenStore,
+                onOpenHome = onOpenHome,
+                onOpenCreate = onOpenCreate,
                 onOpenGallery = {},
                 onOpenSettings = onOpenSettings
             )
@@ -73,7 +73,7 @@ fun GalleryScreen(
             item {
                 Text("Private media", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Generated Store results appear here without exposing backend paths.",
+                    "Generated Create results appear here without exposing backend paths.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -81,7 +81,7 @@ fun GalleryScreen(
             if (items.isEmpty()) {
                 item {
                     Text(
-                        "No Store media yet. Generate an image in Creative Workflows first.",
+                        "No Create media yet. Generate an image in Creative Workflows first.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }

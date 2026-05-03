@@ -74,8 +74,8 @@ fun SettingsScreen(
     onImportSavedChatRecovery: (String, String) -> Unit,
     onRunOnboarding: () -> Unit,
     onLogout: () -> Unit,
-    onOpenChats: () -> Unit,
-    onOpenStore: () -> Unit,
+    onOpenHome: () -> Unit,
+    onOpenCreate: () -> Unit,
     onOpenGallery: () -> Unit
 ) {
     val clipboard = LocalClipboardManager.current
@@ -129,8 +129,8 @@ fun SettingsScreen(
         bottomBar = {
             MainBottomNavigation(
                 selected = MainTab.Settings,
-                onOpenChats = onOpenChats,
-                onOpenStore = onOpenStore,
+                onOpenHome = onOpenHome,
+                onOpenCreate = onOpenCreate,
                 onOpenGallery = onOpenGallery,
                 onOpenSettings = {}
             )
@@ -145,7 +145,7 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .fillMaxSize()
         ) {
-            Text("Remote backend", style = MaterialTheme.typography.titleMedium)
+            Text("Connection", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = urlDraft,
@@ -222,7 +222,7 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Account security", style = MaterialTheme.typography.titleMedium)
+                Text("Security", style = MaterialTheme.typography.titleMedium)
                 AssistChip(onClick = onRefreshPasskeys, label = { Text("Refresh") })
             }
             Spacer(Modifier.height(8.dp))
@@ -395,12 +395,14 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(24.dp))
+            Text("Advanced", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Model", style = MaterialTheme.typography.titleMedium)
+                Text("Model", style = MaterialTheme.typography.titleSmall)
                 AssistChip(onClick = onRefreshModels, label = { Text("Refresh") })
             }
             Spacer(Modifier.height(8.dp))

@@ -71,9 +71,10 @@ import com.nullxoid.android.ui.MainTab
 @Composable
 fun StoreScreen(
     state: AppUiState,
+    initialAddonId: String,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onOpenChats: () -> Unit,
+    onOpenHome: () -> Unit,
     onOpenGallery: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectAddon: (String) -> Unit,
@@ -95,7 +96,12 @@ fun StoreScreen(
                 else -> 10
             }
         }
-    var selectedAddonId by remember { mutableStateOf("local-image-studio") }
+    var selectedAddonId by remember { mutableStateOf(initialAddonId.ifBlank { "local-image-studio" }) }
+    LaunchedEffect(initialAddonId, addons.size) {
+        if (initialAddonId.isNotBlank() && addons.any { it.id == initialAddonId }) {
+            selectedAddonId = initialAddonId
+        }
+    }
     LaunchedEffect(state.activeStoreAddonId, addons.size) {
         val active = state.activeStoreAddonId.takeIf { id -> addons.any { it.id == id } }
         if (!active.isNullOrBlank()) selectedAddonId = active
@@ -127,7 +133,7 @@ fun StoreScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Store") },
+                title = { Text("Create") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -137,15 +143,15 @@ fun StoreScreen(
                     IconButton(
                         modifier = Modifier.testTag("store-refresh"),
                         onClick = onRefresh
-                    ) { Icon(Icons.Default.Refresh, "Refresh Store") }
+                    ) { Icon(Icons.Default.Refresh, "Refresh Create") }
                 }
             )
         },
         bottomBar = {
             MainBottomNavigation(
-                selected = MainTab.Store,
-                onOpenChats = onOpenChats,
-                onOpenStore = {},
+                selected = MainTab.Create,
+                onOpenHome = onOpenHome,
+                onOpenCreate = {},
                 onOpenGallery = onOpenGallery,
                 onOpenSettings = onOpenSettings
             )
@@ -232,7 +238,7 @@ fun StoreScreen(
                 if (state.storeGallery.items.isEmpty()) {
                     item {
                         Text(
-                            "No ${selectedAddon?.name ?: "Store"} artifacts yet.",
+                            "No ${selectedAddon?.name ?: "Create"} artifacts yet.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

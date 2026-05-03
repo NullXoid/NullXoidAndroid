@@ -8,6 +8,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -22,6 +25,7 @@ import com.nullxoid.android.ui.auth.LoginScreen
 import com.nullxoid.android.ui.chat.ChatListScreen
 import com.nullxoid.android.ui.chat.ChatScreen
 import com.nullxoid.android.ui.health.HealthScreen
+import com.nullxoid.android.ui.home.HomeScreen
 import com.nullxoid.android.ui.onboarding.OnboardingScreen
 import com.nullxoid.android.ui.settings.SettingsScreen
 import com.nullxoid.android.ui.store.GalleryScreen
@@ -31,6 +35,7 @@ import com.nullxoid.android.ui.theme.NullXoidTheme
 object Routes {
     const val Onboarding = "onboarding"
     const val Login = "login"
+    const val Home = "home"
     const val ChatList = "chats"
     const val Chat = "chat"
     const val Settings = "settings"
@@ -52,6 +57,17 @@ fun NullXoidApp(
     val nav = rememberNavController()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    var createInitialAddonId by rememberSaveable { mutableStateOf("local-image-studio") }
+
+    fun openHome() {
+        nav.navigate(Routes.Home) { launchSingleTop = true }
+    }
+
+    fun openCreate(addonId: String = "local-image-studio") {
+        createInitialAddonId = addonId
+        vm.refreshStore()
+        nav.navigate(Routes.Store) { launchSingleTop = true }
+    }
 
     LaunchedEffect(Unit) { vm.bootstrap() }
 
@@ -75,7 +91,7 @@ fun NullXoidApp(
     LaunchedEffect(state.auth.authenticated, state.onboardingCompleted) {
         val current = nav.currentBackStackEntry?.destination?.route
         if (state.auth.authenticated && current == Routes.Login) {
-            nav.navigate(if (state.onboardingCompleted) Routes.ChatList else Routes.Onboarding) {
+            nav.navigate(if (state.onboardingCompleted) Routes.Home else Routes.Onboarding) {
                 popUpTo(Routes.Login) { inclusive = true }
             }
         } else if (!state.auth.authenticated &&
@@ -92,7 +108,7 @@ fun NullXoidApp(
     LaunchedEffect(state.onboardingCompleted, state.auth.authenticated) {
         val current = nav.currentBackStackEntry?.destination?.route
         if (state.onboardingCompleted && current == Routes.Onboarding) {
-            nav.navigate(if (state.auth.authenticated) Routes.ChatList else Routes.Login) {
+            nav.navigate(if (state.auth.authenticated) Routes.Home else Routes.Login) {
                 popUpTo(Routes.Onboarding) { inclusive = true }
             }
         }
@@ -129,6 +145,20 @@ fun NullXoidApp(
                         onOidcSetup = vm::startOidcSignIn
                     )
                 }
+                composable(Routes.Home) {
+                    HomeScreen(
+                        state = state,
+                        onCreateImage = { openCreate("local-image-studio") },
+                        onCreateVideo = { openCreate("local-video-studio") },
+                        onCreate3d = { openCreate("local-3d-studio") },
+                        onAskEchoLabs = { nav.navigate(Routes.ChatList) },
+                        onOpenGallery = {
+                            vm.refreshStoreGalleries()
+                            nav.navigate(Routes.Gallery)
+                        },
+                        onOpenSettings = { nav.navigate(Routes.Settings) }
+                    )
+                }
                 composable(Routes.ChatList) {
                     ChatListScreen(
                         state = state,
@@ -141,10 +171,8 @@ fun NullXoidApp(
                             nav.navigate(Routes.Chat)
                         },
                         onRefresh = vm::refreshChats,
-                        onOpenStore = {
-                            vm.refreshStore()
-                            nav.navigate(Routes.Store)
-                        },
+                        onOpenHome = { openHome() },
+                        onOpenCreate = { openCreate() },
                         onOpenGallery = {
                             vm.refreshStoreGalleries()
                             nav.navigate(Routes.Gallery)
@@ -196,11 +224,8 @@ fun NullXoidApp(
                                 popUpTo(0) { inclusive = true }
                             }
                         },
-                        onOpenChats = { nav.navigate(Routes.ChatList) },
-                        onOpenStore = {
-                            vm.refreshStore()
-                            nav.navigate(Routes.Store)
-                        },
+                        onOpenHome = { openHome() },
+                        onOpenCreate = { openCreate() },
                         onOpenGallery = {
                             vm.refreshStoreGalleries()
                             nav.navigate(Routes.Gallery)
@@ -217,9 +242,10 @@ fun NullXoidApp(
                 composable(Routes.Store) {
                     StoreScreen(
                         state = state,
+                        initialAddonId = createInitialAddonId,
                         onBack = { nav.popBackStack() },
                         onRefresh = vm::refreshStore,
-                        onOpenChats = { nav.navigate(Routes.ChatList) },
+                        onOpenHome = { openHome() },
                         onOpenGallery = {
                             vm.refreshStoreGalleries()
                             nav.navigate(Routes.Gallery)
@@ -239,11 +265,8 @@ fun NullXoidApp(
                     GalleryScreen(
                         state = state,
                         onRefresh = vm::refreshStoreGalleries,
-                        onOpenChats = { nav.navigate(Routes.ChatList) },
-                        onOpenStore = {
-                            vm.refreshStore()
-                            nav.navigate(Routes.Store)
-                        },
+                        onOpenHome = { openHome() },
+                        onOpenCreate = { openCreate() },
                         onOpenSettings = { nav.navigate(Routes.Settings) },
                         onSaveArtifact = vm::saveStoreArtifactToDevice,
                         onShareArtifact = vm::shareStoreArtifact,

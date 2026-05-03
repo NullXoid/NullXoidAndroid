@@ -41,7 +41,8 @@ fun ChatListScreen(
     onOpenChat: (ChatRecord) -> Unit,
     onNewChat: () -> Unit,
     onRefresh: () -> Unit,
-    onOpenStore: () -> Unit,
+    onOpenHome: () -> Unit,
+    onOpenCreate: () -> Unit,
     onOpenGallery: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenHealth: () -> Unit
@@ -51,9 +52,9 @@ fun ChatListScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("NullXoid")
+                        Text("Ask EchoLabs")
                         val who = state.auth.displayName ?: state.auth.username ?: "signed in"
-                        Text(who, style = MaterialTheme.typography.labelSmall)
+                        Text("Recent conversations - $who", style = MaterialTheme.typography.labelSmall)
                     }
                 },
                 actions = {
@@ -70,9 +71,9 @@ fun ChatListScreen(
         },
         bottomBar = {
             MainBottomNavigation(
-                selected = MainTab.Chats,
-                onOpenChats = {},
-                onOpenStore = onOpenStore,
+                selected = MainTab.Home,
+                onOpenHome = onOpenHome,
+                onOpenCreate = onOpenCreate,
                 onOpenGallery = onOpenGallery,
                 onOpenSettings = onOpenSettings
             )
@@ -103,7 +104,7 @@ fun ChatListScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        "No chats yet. Tap + to start one.",
+                        "No conversations yet. Tap + to ask EchoLabs.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }

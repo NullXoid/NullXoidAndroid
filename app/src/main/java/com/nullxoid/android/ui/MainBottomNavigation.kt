@@ -1,10 +1,10 @@
 package com.nullxoid.android.ui
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -14,8 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 
 enum class MainTab {
-    Chats,
-    Store,
+    Home,
+    Create,
     Gallery,
     Settings
 }
@@ -23,25 +23,25 @@ enum class MainTab {
 @Composable
 fun MainBottomNavigation(
     selected: MainTab,
-    onOpenChats: () -> Unit,
-    onOpenStore: () -> Unit,
+    onOpenHome: () -> Unit,
+    onOpenCreate: () -> Unit,
     onOpenGallery: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     NavigationBar(modifier = Modifier.testTag("main-bottom-nav")) {
         NavigationBarItem(
-            selected = selected == MainTab.Chats,
-            onClick = onOpenChats,
-            icon = { Icon(Icons.Default.ChatBubble, "Chats") },
-            label = { Text("Chats") },
-            modifier = Modifier.testTag("bottom-nav-chats")
+            selected = selected == MainTab.Home,
+            onClick = onOpenHome,
+            icon = { Icon(Icons.Default.Home, "Home") },
+            label = { Text("Home") },
+            modifier = Modifier.testTag("bottom-nav-home")
         )
         NavigationBarItem(
-            selected = selected == MainTab.Store,
-            onClick = onOpenStore,
-            icon = { Icon(Icons.Default.Storefront, "Store") },
-            label = { Text("Store") },
-            modifier = Modifier.testTag("bottom-nav-store")
+            selected = selected == MainTab.Create,
+            onClick = onOpenCreate,
+            icon = { Icon(Icons.Default.AutoAwesome, "Create") },
+            label = { Text("Create") },
+            modifier = Modifier.testTag("bottom-nav-create")
         )
         NavigationBarItem(
             selected = selected == MainTab.Gallery,
