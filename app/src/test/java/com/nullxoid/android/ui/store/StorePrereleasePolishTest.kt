@@ -2,7 +2,9 @@ package com.nullxoid.android.ui.store
 
 import com.nullxoid.android.data.model.StoreAddon
 import com.nullxoid.android.data.model.StoreArtifactRef
+import com.nullxoid.android.data.model.StoreGalleryResponse
 import com.nullxoid.android.data.model.StoreJobType
+import com.nullxoid.android.data.api.NullXoidApiJson
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -83,5 +85,34 @@ class StorePrereleasePolishTest {
         assertTrue(failed.terminal)
         assertTrue(failed.failed)
         assertFalse(failed.helper.contains("PROVIDER_EXECUTION_FAILED"))
+    }
+
+    @Test
+    fun galleryResponseCoercesNullPreviewUrlsToSafeDefaults() {
+        val payload = """
+            {
+              "ok": true,
+              "addonId": "local-image-studio",
+              "items": [
+                {
+                  "artifactId": "artifact-safe-id",
+                  "thumbnailUrl": "/artifacts/artifact-safe-id/thumb",
+                  "previewUrl": null,
+                  "modelPreviewUrl": null,
+                  "mimeType": "image/png",
+                  "status": "ready"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val gallery = NullXoidApiJson.decodeFromString<StoreGalleryResponse>(payload)
+        val item = gallery.items.single()
+
+        assertEquals("", item.previewUrl)
+        assertEquals("", item.modelPreviewUrl)
+        assertEquals("/artifacts/artifact-safe-id/thumb", item.thumbnailUrl)
+        assertFalse(item.toString().contains("workflow"))
+        assertFalse(item.toString().contains("token"))
     }
 }

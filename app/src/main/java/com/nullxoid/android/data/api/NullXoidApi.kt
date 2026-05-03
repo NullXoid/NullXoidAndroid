@@ -37,6 +37,13 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
+internal val NullXoidApiJson = Json {
+    ignoreUnknownKeys = true
+    explicitNulls = false
+    encodeDefaults = true
+    coerceInputValues = true
+}
+
 /**
  * Thin typed wrapper over [HttpClient] implementing the endpoints the desktop
  * bridge uses. Paths are kept verbatim so the app works against the same
@@ -45,11 +52,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class NullXoidApi(
     private val baseUrlProvider: () -> String
 ) {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        explicitNulls = false
-        encodeDefaults = true
-    }
+    private val json = NullXoidApiJson
 
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
