@@ -303,6 +303,17 @@ data class StoreApprovalRoute(
 )
 
 @Serializable
+data class StoreJobType(
+    val id: String = "",
+    val label: String = "",
+    val description: String = "",
+    val imageSize: String = "",
+    val videoSize: String = "",
+    val durationMs: Int = 0,
+    val format: String = ""
+)
+
+@Serializable
 data class StoreAddon(
     val id: String = "",
     val name: String = "",
@@ -318,6 +329,7 @@ data class StoreAddon(
     val requiresApproval: Boolean = false,
     val approvalRoute: StoreApprovalRoute? = null,
     val providerKinds: List<String> = emptyList(),
+    val jobTypes: List<StoreJobType> = emptyList(),
     val defaultOutputFormat: String = "",
     val outputFormats: List<String> = emptyList(),
     val permissions: List<JsonObject> = emptyList(),
@@ -354,7 +366,9 @@ data class StoreArtifactRef(
     val previewUrl: String = "",
     val modelPreviewUrl: String = "",
     val durationMs: Int = 0,
-    val format: String = ""
+    val format: String = "",
+    val createdAt: String = "",
+    val updatedAt: String = ""
 )
 
 @Serializable

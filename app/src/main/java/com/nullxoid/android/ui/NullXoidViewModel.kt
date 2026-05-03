@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -23,6 +24,7 @@ import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.PasskeyCredentialRecord
 import com.nullxoid.android.data.model.PasskeyProviderStatus
 import com.nullxoid.android.data.model.StoreActionResponse
+import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.data.model.StoreCatalogResponse
 import com.nullxoid.android.data.model.StoreGalleryResponse
 import com.nullxoid.android.data.model.StreamEvent
@@ -31,6 +33,7 @@ import com.nullxoid.android.data.repo.NullXoidRepository
 import com.nullxoid.android.data.update.AppUpdateChecker
 import com.nullxoid.android.data.update.AppUpdateInfo
 import com.nullxoid.android.data.update.AppUpdateInstaller
+import com.nullxoid.android.ui.store.safePreviewPath
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -48,6 +51,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
 import java.time.Instant
 
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
@@ -189,10 +193,16 @@ data class AppUiState(
     val passkeyLoading: Boolean = false,
     val storeCatalog: StoreCatalogResponse = StoreCatalogResponse(),
     val storeGallery: StoreGalleryResponse = StoreGalleryResponse(addonId = "local-image-studio"),
+    val storeGalleryAll: List<StoreArtifactRef> = emptyList(),
     val storeAction: StoreActionResponse? = null,
     val storeLoading: Boolean = false,
     val activeStoreJobId: String = "",
     val activeStoreAddonId: String = "",
+    val storePreviewBytes: Map<String, ByteArray> = emptyMap(),
+    val storeViewerArtifact: StoreArtifactRef? = null,
+    val storeViewerBytes: ByteArray = ByteArray(0),
+    val storeViewerLoading: Boolean = false,
+    val storeViewerError: String = "",
     val storeSaveStatus: String = "",
     val onboardingCompleted: Boolean = false,
     val currentAppVersionName: String = BuildConfig.VERSION_NAME,
@@ -466,18 +476,63 @@ class NullXoidViewModel(
             runCatching {
                 val catalog = repo.storeCatalog()
                 val galleryAddonId = _state.value.activeStoreAddonId.ifBlank { "local-image-studio" }
+                val activeJob = _state.value.activeStoreJobId
+                    .takeIf { it.isNotBlank() }
+                    ?.let { jobId -> runCatching { repo.storeJob(jobId) }.getOrNull() }
                 val gallery = repo.storeGallery(galleryAddonId)
-                catalog to gallery
-            }.onSuccess { (catalog, gallery) ->
+                Triple(catalog, gallery, activeJob)
+            }.onSuccess { (catalog, gallery, activeJob) ->
+                if (activeJob?.status in STORE_TERMINAL_STATUSES) {
+                    settingsStore.clearActiveStoreJob()
+                }
                 _state.value = _state.value.copy(
                     storeLoading = false,
                     storeCatalog = catalog,
-                    storeGallery = gallery
+                    storeGallery = gallery,
+                    storeAction = activeJob ?: _state.value.storeAction,
+                    activeStoreJobId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else _state.value.activeStoreJobId,
+                    activeStoreAddonId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else _state.value.activeStoreAddonId
                 )
             }.onFailure { t ->
                 _state.value = _state.value.copy(
                     storeLoading = false,
                     error = t.message ?: "Store refresh failed"
+                )
+            }
+        }
+    }
+
+    fun refreshStoreGallery(addonId: String) {
+        if (addonId.isBlank()) return
+        viewModelScope.launch {
+            runCatching { repo.storeGallery(addonId) }
+                .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
+                .onFailure { t -> _state.value = _state.value.copy(error = t.message ?: "Gallery refresh failed") }
+        }
+    }
+
+    fun refreshStoreGalleries() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(storeLoading = true, error = null)
+            runCatching {
+                val catalog = if (_state.value.storeCatalog.addons.isEmpty()) repo.storeCatalog() else _state.value.storeCatalog
+                val creativeAddons = catalog.addons.filter {
+                    it.id in setOf("local-image-studio", "local-video-studio", "local-3d-studio")
+                }
+                val galleries = creativeAddons.flatMap { addon ->
+                    runCatching { repo.storeGallery(addon.id).items }.getOrDefault(emptyList())
+                }
+                catalog to galleries
+            }.onSuccess { (catalog, items) ->
+                _state.value = _state.value.copy(
+                    storeLoading = false,
+                    storeCatalog = catalog,
+                    storeGalleryAll = items
+                )
+            }.onFailure { t ->
+                _state.value = _state.value.copy(
+                    storeLoading = false,
+                    error = t.message ?: "Gallery refresh failed"
                 )
             }
         }
@@ -494,6 +549,28 @@ class NullXoidViewModel(
     }
 
     fun runStoreAddon(addonId: String, action: String, capability: String, prompt: String, imageSize: String) {
+        runStoreAddon(
+            addonId = addonId,
+            action = action,
+            capability = capability,
+            prompt = prompt,
+            imageSize = imageSize,
+            jobType = "",
+            durationMs = 4000,
+            format = "glb"
+        )
+    }
+
+    fun runStoreAddon(
+        addonId: String,
+        action: String,
+        capability: String,
+        prompt: String,
+        imageSize: String,
+        jobType: String,
+        durationMs: Int,
+        format: String
+    ) {
         val cleanPrompt = prompt.trim()
         if (cleanPrompt.isBlank()) {
             _state.value = _state.value.copy(error = "Prompt required")
@@ -511,7 +588,10 @@ class NullXoidViewModel(
                     action = action,
                     prompt = cleanPrompt,
                     imageSize = imageSize,
-                    capability = capability
+                    capability = capability,
+                    durationMs = durationMs,
+                    format = format,
+                    jobType = jobType
                 )
             }.onSuccess { result ->
                 val storeJobId = result.storeJobId ?: result.jobId.orEmpty()
@@ -548,6 +628,10 @@ class NullXoidViewModel(
         }
     }
 
+    fun resumeStoreJobPolling() {
+        resumeActiveStoreJob()
+    }
+
     private fun startStoreJobPolling(storeJobId: String, addonId: String, initialPollAfterMs: Int = 1500) {
         storePollJob?.cancel()
         storePollJob = viewModelScope.launch {
@@ -568,10 +652,8 @@ class NullXoidViewModel(
                 if (result.status in STORE_TERMINAL_STATUSES) {
                     runCatching { repo.storeGallery(addonId) }
                         .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
-                    if (result.status == "completed") {
-                        settingsStore.clearActiveStoreJob()
-                        _state.value = _state.value.copy(activeStoreJobId = "", activeStoreAddonId = "")
-                    }
+                    settingsStore.clearActiveStoreJob()
+                    _state.value = _state.value.copy(activeStoreJobId = "", activeStoreAddonId = "")
                     break
                 }
             }
@@ -592,6 +674,89 @@ class NullXoidViewModel(
                 _state.value = _state.value.copy(storeSaveStatus = "Saved to device: $uri")
             }.onFailure { t ->
                 _state.value = _state.value.copy(storeSaveStatus = t.message ?: "Save failed")
+            }
+        }
+    }
+
+    fun ensureStorePreview(item: StoreArtifactRef) {
+        val artifactId = item.artifactId
+        if (artifactId.isBlank() || _state.value.storePreviewBytes.containsKey(artifactId)) return
+        viewModelScope.launch {
+            runCatching {
+                val previewPath = safePreviewPath(item)
+                when {
+                    previewPath.isNotBlank() -> repo.storeBytesAtPath(previewPath)
+                    item.mimeType.startsWith("image/") -> repo.storeArtifactBytes(artifactId)
+                    else -> ByteArray(0)
+                }
+            }.onSuccess { bytes ->
+                if (bytes.isNotEmpty()) {
+                    _state.value = _state.value.copy(
+                        storePreviewBytes = _state.value.storePreviewBytes + (artifactId to bytes)
+                    )
+                }
+            }
+        }
+    }
+
+    fun openStoreArtifactViewer(item: StoreArtifactRef) {
+        if (item.artifactId.isBlank()) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                storeViewerArtifact = item,
+                storeViewerBytes = ByteArray(0),
+                storeViewerLoading = true,
+                storeViewerError = ""
+            )
+            runCatching { repo.storeArtifactBytes(item.artifactId) }
+                .onSuccess { bytes ->
+                    _state.value = _state.value.copy(
+                        storeViewerBytes = bytes,
+                        storeViewerLoading = false,
+                        storeViewerError = ""
+                    )
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        storeViewerLoading = false,
+                        storeViewerError = t.message ?: "Could not open artifact"
+                    )
+                }
+        }
+    }
+
+    fun closeStoreArtifactViewer() {
+        _state.value = _state.value.copy(
+            storeViewerArtifact = null,
+            storeViewerBytes = ByteArray(0),
+            storeViewerLoading = false,
+            storeViewerError = ""
+        )
+    }
+
+    fun shareStoreArtifact(artifactId: String, mimeType: String) {
+        if (artifactId.isBlank()) {
+            _state.value = _state.value.copy(storeSaveStatus = "No artifact selected")
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(storeSaveStatus = "Preparing share...")
+            runCatching {
+                val bytes = repo.storeArtifactBytes(artifactId)
+                cacheMediaBytesForShare(artifactId, mimeType, bytes)
+            }.onSuccess { uri ->
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = mimeType.ifBlank { "application/octet-stream" }
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val chooser = Intent.createChooser(shareIntent, "Share EchoLabs media")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                appContext.startActivity(chooser)
+                _state.value = _state.value.copy(storeSaveStatus = "Share sheet opened")
+            }.onFailure { t ->
+                _state.value = _state.value.copy(storeSaveStatus = t.message ?: "Share failed")
             }
         }
     }
@@ -617,6 +782,22 @@ class NullXoidViewModel(
             resolver.openOutputStream(uri)?.use { output -> output.write(bytes) }
                 ?: error("Could not open device media item")
             uri
+        }
+
+    private suspend fun cacheMediaBytesForShare(artifactId: String, mimeType: String, bytes: ByteArray): Uri =
+        withContext(Dispatchers.IO) {
+            val extension = when {
+                mimeType == "video/webm" -> "webm"
+                mimeType.startsWith("video/") -> "mp4"
+                mimeType == "image/jpeg" -> "jpg"
+                mimeType.startsWith("model/") -> "glb"
+                else -> "png"
+            }
+            val safeId = artifactId.replace(Regex("[^A-Za-z0-9_.-]"), "_")
+            val dir = File(appContext.cacheDir, "shared_store_artifacts").apply { mkdirs() }
+            val file = File(dir, "echolabs-$safeId.$extension")
+            file.writeBytes(bytes)
+            FileProvider.getUriForFile(appContext, "${appContext.packageName}.fileprovider", file)
         }
 
     fun refreshPasskeys() {

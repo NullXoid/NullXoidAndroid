@@ -12,12 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -34,6 +31,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.model.ChatRecord
 import com.nullxoid.android.ui.AppUiState
+import com.nullxoid.android.ui.MainBottomNavigation
+import com.nullxoid.android.ui.MainTab
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,9 +42,9 @@ fun ChatListScreen(
     onNewChat: () -> Unit,
     onRefresh: () -> Unit,
     onOpenStore: () -> Unit,
+    onOpenGallery: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenHealth: () -> Unit,
-    onLogout: () -> Unit
+    onOpenHealth: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -61,24 +60,21 @@ fun ChatListScreen(
                     IconButton(
                         modifier = Modifier.testTag("chat-list-refresh"),
                         onClick = onRefresh
-                    ) { Icon(Icons.Default.Refresh, null) }
+                    ) { Icon(Icons.Default.Refresh, "Refresh chats") }
                     IconButton(
                         modifier = Modifier.testTag("chat-list-health"),
                         onClick = onOpenHealth
-                    ) { Icon(Icons.Default.Favorite, "health") }
-                    IconButton(
-                        modifier = Modifier.testTag("chat-list-store"),
-                        onClick = onOpenStore
-                    ) { Icon(Icons.Default.Storefront, "Store") }
-                    IconButton(
-                        modifier = Modifier.testTag("chat-list-settings"),
-                        onClick = onOpenSettings
-                    ) { Icon(Icons.Default.Settings, null) }
-                    IconButton(
-                        modifier = Modifier.testTag("chat-list-logout"),
-                        onClick = onLogout
-                    ) { Icon(Icons.AutoMirrored.Filled.Logout, null) }
+                    ) { Icon(Icons.Default.Favorite, "Backend health") }
                 }
+            )
+        },
+        bottomBar = {
+            MainBottomNavigation(
+                selected = MainTab.Chats,
+                onOpenChats = {},
+                onOpenStore = onOpenStore,
+                onOpenGallery = onOpenGallery,
+                onOpenSettings = onOpenSettings
             )
         },
         floatingActionButton = {

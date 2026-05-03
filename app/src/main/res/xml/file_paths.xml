@@ -3,4 +3,7 @@
     <cache-path
         name="update_apks"
         path="updates/" />
+    <cache-path
+        name="shared_store_artifacts"
+        path="shared_store_artifacts/" />
 </paths>

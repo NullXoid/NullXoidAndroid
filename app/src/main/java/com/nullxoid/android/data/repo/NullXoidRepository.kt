@@ -235,6 +235,12 @@ class NullXoidRepository(
 
     suspend fun storeArtifactBytes(artifactId: String): ByteArray = api.getBytes("/artifacts/$artifactId")
 
+    suspend fun storeBytesAtPath(path: String): ByteArray {
+        require(path.startsWith("/")) { "Only backend-relative artifact routes are supported." }
+        require(!path.startsWith("//") && !path.contains("..")) { "Unsafe artifact route." }
+        return api.getBytes(path)
+    }
+
     suspend fun runStoreAction(
         addonId: String,
         action: String,

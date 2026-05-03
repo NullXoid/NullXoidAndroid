@@ -4,11 +4,15 @@ import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,6 +24,7 @@ import com.nullxoid.android.ui.chat.ChatScreen
 import com.nullxoid.android.ui.health.HealthScreen
 import com.nullxoid.android.ui.onboarding.OnboardingScreen
 import com.nullxoid.android.ui.settings.SettingsScreen
+import com.nullxoid.android.ui.store.GalleryScreen
 import com.nullxoid.android.ui.store.StoreScreen
 import com.nullxoid.android.ui.theme.NullXoidTheme
 
@@ -31,6 +36,7 @@ object Routes {
     const val Settings = "settings"
     const val Health = "health"
     const val Store = "store"
+    const val Gallery = "gallery"
 }
 
 @Composable
@@ -45,8 +51,19 @@ fun NullXoidApp(
     val state by vm.state.collectAsState()
     val nav = rememberNavController()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(Unit) { vm.bootstrap() }
+
+    DisposableEffect(lifecycleOwner, state.auth.authenticated) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && state.auth.authenticated) {
+                vm.resumeStoreJobPolling()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(oidcRedirect) {
         if (oidcRedirect != null) {
@@ -128,9 +145,12 @@ fun NullXoidApp(
                             vm.refreshStore()
                             nav.navigate(Routes.Store)
                         },
+                        onOpenGallery = {
+                            vm.refreshStoreGalleries()
+                            nav.navigate(Routes.Gallery)
+                        },
                         onOpenSettings = { nav.navigate(Routes.Settings) },
-                        onOpenHealth = { nav.navigate(Routes.Health) },
-                        onLogout = vm::logout
+                        onOpenHealth = { nav.navigate(Routes.Health) }
                     )
                 }
                 composable(Routes.Chat) {
@@ -169,6 +189,21 @@ fun NullXoidApp(
                         onRunOnboarding = {
                             vm.resetOnboarding()
                             nav.navigate(Routes.Onboarding)
+                        },
+                        onLogout = {
+                            vm.logout()
+                            nav.navigate(Routes.Login) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onOpenChats = { nav.navigate(Routes.ChatList) },
+                        onOpenStore = {
+                            vm.refreshStore()
+                            nav.navigate(Routes.Store)
+                        },
+                        onOpenGallery = {
+                            vm.refreshStoreGalleries()
+                            nav.navigate(Routes.Gallery)
                         }
                     )
                 }
@@ -184,8 +219,37 @@ fun NullXoidApp(
                         state = state,
                         onBack = { nav.popBackStack() },
                         onRefresh = vm::refreshStore,
+                        onOpenChats = { nav.navigate(Routes.ChatList) },
+                        onOpenGallery = {
+                            vm.refreshStoreGalleries()
+                            nav.navigate(Routes.Gallery)
+                        },
+                        onOpenSettings = { nav.navigate(Routes.Settings) },
+                        onSelectAddon = vm::refreshStoreGallery,
                         onRunStoreAddon = vm::runStoreAddon,
-                        onSaveArtifact = vm::saveStoreArtifactToDevice
+                        onSaveArtifact = vm::saveStoreArtifactToDevice,
+                        onShareArtifact = vm::shareStoreArtifact,
+                        onViewArtifact = vm::openStoreArtifactViewer,
+                        onLoadPreview = vm::ensureStorePreview,
+                        onCloseViewer = vm::closeStoreArtifactViewer,
+                        onResumeStoreJob = vm::resumeStoreJobPolling
+                    )
+                }
+                composable(Routes.Gallery) {
+                    GalleryScreen(
+                        state = state,
+                        onRefresh = vm::refreshStoreGalleries,
+                        onOpenChats = { nav.navigate(Routes.ChatList) },
+                        onOpenStore = {
+                            vm.refreshStore()
+                            nav.navigate(Routes.Store)
+                        },
+                        onOpenSettings = { nav.navigate(Routes.Settings) },
+                        onSaveArtifact = vm::saveStoreArtifactToDevice,
+                        onShareArtifact = vm::shareStoreArtifact,
+                        onViewArtifact = vm::openStoreArtifactViewer,
+                        onLoadPreview = vm::ensureStorePreview,
+                        onCloseViewer = vm::closeStoreArtifactViewer
                     )
                 }
             }

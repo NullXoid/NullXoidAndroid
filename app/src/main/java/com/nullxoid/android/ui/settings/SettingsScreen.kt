@@ -47,6 +47,8 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.ui.AppUiState
+import com.nullxoid.android.ui.MainBottomNavigation
+import com.nullxoid.android.ui.MainTab
 import com.nullxoid.android.ui.qr.NullXoidQrCaptureActivity
 import com.nullxoid.android.ui.availableUpdateSources
 import com.nullxoid.android.ui.passkeyEnrollmentStatusText
@@ -70,7 +72,11 @@ fun SettingsScreen(
     onRegisterPasskey: () -> Unit,
     onRevokePasskey: (String) -> Unit,
     onImportSavedChatRecovery: (String, String) -> Unit,
-    onRunOnboarding: () -> Unit
+    onRunOnboarding: () -> Unit,
+    onLogout: () -> Unit,
+    onOpenChats: () -> Unit,
+    onOpenStore: () -> Unit,
+    onOpenGallery: () -> Unit
 ) {
     val clipboard = LocalClipboardManager.current
     var urlDraft by remember(state.backendUrl) { mutableStateOf(state.backendUrl) }
@@ -118,6 +124,15 @@ fun SettingsScreen(
                         onClick = onBack
                     ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 }
+            )
+        },
+        bottomBar = {
+            MainBottomNavigation(
+                selected = MainTab.Settings,
+                onOpenChats = onOpenChats,
+                onOpenStore = onOpenStore,
+                onOpenGallery = onOpenGallery,
+                onOpenSettings = {}
             )
         }
     ) { inner ->
@@ -175,6 +190,31 @@ fun SettingsScreen(
                 modifier = Modifier.testTag("settings-run-onboarding"),
                 onClick = onRunOnboarding
             ) { Text("Run guided setup") }
+
+            if (state.auth.authenticated) {
+                Spacer(Modifier.height(24.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("Account", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            state.auth.displayName ?: state.auth.username ?: "Signed in",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(
+                            modifier = Modifier.testTag("settings-logout"),
+                            onClick = onLogout
+                        ) {
+                            Text("Sign out")
+                        }
+                    }
+                }
+            }
 
             Spacer(Modifier.height(24.dp))
             Row(
