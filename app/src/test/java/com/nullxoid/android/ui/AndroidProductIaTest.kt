@@ -152,4 +152,16 @@ class AndroidProductIaTest {
         assertFalse(store.contains("workflow path"))
         assertFalse(store.contains("provider config"))
     }
+
+    @Test
+    fun videoViewerPlaysInsideAppWithNativeControls() {
+        val store = File("src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt").readText()
+
+        assertTrue(store.contains("MediaController"))
+        assertTrue(store.contains("VideoView"))
+        assertTrue(store.contains("store-video-player"))
+        assertTrue(store.contains("Tap the video for playback controls."))
+        assertTrue(store.contains("setMediaController"))
+        assertTrue(store.contains("start()"))
+    }
 }

@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -945,21 +946,50 @@ private fun InlineVideoPlayer(
         val dir = File(context.cacheDir, "shared_store_artifacts").apply { mkdirs() }
         File(dir, "$artifactId.mp4").also { it.writeBytes(bytes) }
     }
-    AndroidView(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        factory = { viewContext ->
-            VideoView(viewContext).apply {
-                setVideoPath(videoFile.absolutePath)
-                setOnPreparedListener { mediaPlayer ->
-                    mediaPlayer.isLooping = false
-                    start()
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AndroidView(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .background(Color.Black, RoundedCornerShape(12.dp))
+                .testTag("store-video-player"),
+            factory = { viewContext ->
+                VideoView(viewContext).apply {
+                    val videoView = this
+                    val controller = MediaController(viewContext).apply {
+                        setAnchorView(videoView)
+                    }
+                    setMediaController(controller)
+                    setOnPreparedListener { mediaPlayer ->
+                        mediaPlayer.isLooping = false
+                        start()
+                        controller.show(0)
+                    }
+                    setOnCompletionListener {
+                        controller.show(0)
+                    }
+                    requestFocus()
+                    tag = videoFile.absolutePath
+                    setVideoPath(videoFile.absolutePath)
+                }
+            },
+            update = { view ->
+                if (view.tag != videoFile.absolutePath) {
+                    view.tag = videoFile.absolutePath
+                    view.setVideoPath(videoFile.absolutePath)
                 }
             }
-        },
-        update = { view ->
-            view.setVideoPath(videoFile.absolutePath)
-        }
-    )
+        )
+        Text(
+            "Tap the video for playback controls.",
+            color = Color.White,
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
 }
 
 @Composable
