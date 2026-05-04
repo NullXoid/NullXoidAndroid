@@ -32,6 +32,7 @@ import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.ui.AppUiState
 import com.nullxoid.android.ui.MainBottomNavigation
 import com.nullxoid.android.ui.MainTab
+import com.nullxoid.android.ui.mainTabSwipeNavigation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +79,13 @@ fun GalleryScreen(
                 .navigationBarsPadding()
                 .imePadding()
                 .fillMaxSize()
+                .mainTabSwipeNavigation(
+                    selected = MainTab.Gallery,
+                    onOpenCreate = onOpenCreate,
+                    onOpenGallery = {},
+                    onOpenAsk = onOpenAsk,
+                    onOpenSettings = onOpenSettings
+                )
                 .testTag("gallery-screen"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

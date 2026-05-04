@@ -110,6 +110,25 @@ class AndroidProductIaTest {
     }
 
     @Test
+    fun topLevelScreensSupportLeftRightSwipeNavigation() {
+        val bottomNav = File("src/main/java/com/nullxoid/android/ui/MainBottomNavigation.kt").readText()
+
+        assertTrue(bottomNav.contains("mainTabSwipeNavigation"))
+        assertTrue(bottomNav.contains("detectHorizontalDragGestures"))
+        assertTrue(bottomNav.contains("MainTab.entries"))
+
+        listOf(
+            "src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt",
+            "src/main/java/com/nullxoid/android/ui/store/GalleryScreen.kt",
+            "src/main/java/com/nullxoid/android/ui/chat/ChatListScreen.kt",
+            "src/main/java/com/nullxoid/android/ui/settings/SettingsScreen.kt"
+        ).forEach { path ->
+            val source = File(path).readText()
+            assertTrue("$path should apply swipe navigation", source.contains(".mainTabSwipeNavigation("))
+        }
+    }
+
+    @Test
     fun androidUiDoesNotExposeProviderOrPathMarkers() {
         val source = listOf(
             "src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt",

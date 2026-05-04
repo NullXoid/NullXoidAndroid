@@ -35,6 +35,7 @@ import com.nullxoid.android.data.model.ChatRecord
 import com.nullxoid.android.ui.AppUiState
 import com.nullxoid.android.ui.MainBottomNavigation
 import com.nullxoid.android.ui.MainTab
+import com.nullxoid.android.ui.mainTabSwipeNavigation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,6 +95,13 @@ fun ChatListScreen(
                 .navigationBarsPadding()
                 .imePadding()
                 .fillMaxSize()
+                .mainTabSwipeNavigation(
+                    selected = MainTab.Ask,
+                    onOpenCreate = onOpenCreate,
+                    onOpenGallery = onOpenGallery,
+                    onOpenAsk = onOpenAsk,
+                    onOpenSettings = onOpenSettings
+                )
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()

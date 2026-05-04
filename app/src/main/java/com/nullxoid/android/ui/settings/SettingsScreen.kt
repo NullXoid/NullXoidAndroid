@@ -47,6 +47,7 @@ import com.nullxoid.android.ui.MainBottomNavigation
 import com.nullxoid.android.ui.MainTab
 import com.nullxoid.android.ui.qr.NullXoidQrCaptureActivity
 import com.nullxoid.android.ui.availableUpdateSources
+import com.nullxoid.android.ui.mainTabSwipeNavigation
 import com.nullxoid.android.ui.passkeyEnrollmentStatusText
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -131,6 +132,13 @@ fun SettingsScreen(
                 .padding(20.dp)
                 .navigationBarsPadding()
                 .imePadding()
+                .mainTabSwipeNavigation(
+                    selected = MainTab.Settings,
+                    onOpenCreate = onOpenCreate,
+                    onOpenGallery = onOpenGallery,
+                    onOpenAsk = onOpenAsk,
+                    onOpenSettings = {}
+                )
                 .verticalScroll(rememberScrollState())
                 .fillMaxSize()
         ) {

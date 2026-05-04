@@ -1,5 +1,6 @@
 package com.nullxoid.android.ui
 
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
@@ -11,13 +12,44 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import kotlin.math.abs
 
 enum class MainTab {
     Create,
     Gallery,
     Ask,
     Settings
+}
+
+fun Modifier.mainTabSwipeNavigation(
+    selected: MainTab,
+    onOpenCreate: () -> Unit,
+    onOpenGallery: () -> Unit,
+    onOpenAsk: () -> Unit,
+    onOpenSettings: () -> Unit
+): Modifier = pointerInput(selected) {
+    var horizontalDrag = 0f
+    detectHorizontalDragGestures(
+        onDragStart = { horizontalDrag = 0f },
+        onHorizontalDrag = { _, dragAmount -> horizontalDrag += dragAmount },
+        onDragCancel = { horizontalDrag = 0f },
+        onDragEnd = {
+            if (abs(horizontalDrag) >= 120f) {
+                val tabs = MainTab.entries
+                val index = tabs.indexOf(selected)
+                val nextIndex = if (horizontalDrag < 0) index + 1 else index - 1
+                when (tabs.getOrNull(nextIndex)) {
+                    MainTab.Create -> onOpenCreate()
+                    MainTab.Gallery -> onOpenGallery()
+                    MainTab.Ask -> onOpenAsk()
+                    MainTab.Settings -> onOpenSettings()
+                    null -> Unit
+                }
+            }
+        }
+    )
 }
 
 @Composable

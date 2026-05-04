@@ -78,6 +78,7 @@ import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.ui.AppUiState
 import com.nullxoid.android.ui.MainBottomNavigation
 import com.nullxoid.android.ui.MainTab
+import com.nullxoid.android.ui.mainTabSwipeNavigation
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -195,6 +196,13 @@ fun StoreScreen(
                 .navigationBarsPadding()
                 .imePadding()
                 .fillMaxSize()
+                .mainTabSwipeNavigation(
+                    selected = MainTab.Create,
+                    onOpenCreate = {},
+                    onOpenGallery = onOpenGallery,
+                    onOpenAsk = onOpenAsk,
+                    onOpenSettings = onOpenSettings
+                )
                 .testTag("store-screen"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
