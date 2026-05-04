@@ -183,6 +183,9 @@ class AndroidProductIaTest {
         assertTrue(store.contains("store-video-player"))
         assertTrue(store.contains("Tap the video for playback controls."))
         assertTrue(store.contains("setMediaController"))
+        assertTrue(store.contains("FileProvider.getUriForFile"))
+        assertTrue(store.contains("setVideoURI"))
         assertTrue(store.contains("start()"))
+        assertFalse(store.contains("setVideoPath(videoFile.absolutePath)"))
     }
 }

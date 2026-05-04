@@ -73,6 +73,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.nullxoid.android.data.model.StoreAddon
 import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.ui.AppUiState
@@ -954,6 +955,9 @@ private fun InlineVideoPlayer(
         val dir = File(context.cacheDir, "shared_store_artifacts").apply { mkdirs() }
         File(dir, "$artifactId.mp4").also { it.writeBytes(bytes) }
     }
+    val videoUri = remember(artifactId, videoFile) {
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", videoFile)
+    }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -981,14 +985,14 @@ private fun InlineVideoPlayer(
                         controller.show(0)
                     }
                     requestFocus()
-                    tag = videoFile.absolutePath
-                    setVideoPath(videoFile.absolutePath)
+                    tag = artifactId
+                    setVideoURI(videoUri)
                 }
             },
             update = { view ->
-                if (view.tag != videoFile.absolutePath) {
-                    view.tag = videoFile.absolutePath
-                    view.setVideoPath(videoFile.absolutePath)
+                if (view.tag != artifactId) {
+                    view.tag = artifactId
+                    view.setVideoURI(videoUri)
                 }
             }
         )
