@@ -636,7 +636,7 @@ class NullXoidViewModel(
                         "Record a voice clip before generating with recorded voice."
                     }
                     val bytes = withContext(Dispatchers.IO) { audioFile.readBytes() }
-                    val uploaded = repo.uploadStoreAudio("voice-note.m4a", "audio/mp4", bytes)
+                    val uploaded = repo.uploadStoreAudio("voice-note.wav", "audio/wav", bytes)
                     require(uploaded.isNotBlank()) { "Voice upload failed." }
                     runCatching { audioFile.delete() }
                     uploaded

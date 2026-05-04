@@ -1,10 +1,12 @@
 package com.nullxoid.android.ui.store
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.media.AudioFormat
+import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.os.Build
 import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -76,6 +78,7 @@ import com.nullxoid.android.ui.AppUiState
 import com.nullxoid.android.ui.MainBottomNavigation
 import com.nullxoid.android.ui.MainTab
 import java.io.File
+import java.io.RandomAccessFile
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,7 +147,7 @@ fun StoreScreen(
     }
     var audioPrompt by remember(selectedAddon?.id) { mutableStateOf("") }
     var recordedAudioPath by remember(selectedAddon?.id) { mutableStateOf("") }
-    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    var recorder by remember { mutableStateOf<WavVoiceRecorder?>(null) }
     var recording by remember { mutableStateOf(false) }
     var audioStatus by remember(selectedAddon?.id) { mutableStateOf("") }
     val micPermissionLauncher = rememberLauncherForActivityResult(
@@ -260,6 +263,7 @@ fun StoreScreen(
                             stopVoiceRecording(
                                 recorder = recorder,
                                 onRecorder = { recorder = it },
+                                onRecordedPath = { recordedAudioPath = it },
                                 onRecording = { recording = it },
                                 onStatus = { audioStatus = it }
                             )
@@ -340,31 +344,20 @@ fun StoreScreen(
 
 private fun startVoiceRecording(
     context: Context,
-    onRecorder: (MediaRecorder?) -> Unit,
+    onRecorder: (WavVoiceRecorder?) -> Unit,
     onRecordedPath: (String) -> Unit,
     onRecording: (Boolean) -> Unit,
     onStatus: (String) -> Unit
 ) {
     val dir = File(context.cacheDir, "store_voice_inputs").apply { mkdirs() }
-    val output = File(dir, "voice-${System.currentTimeMillis()}.m4a")
+    val output = File(dir, "voice-${System.currentTimeMillis()}.wav")
     runCatching {
-        @Suppress("DEPRECATION")
-        val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            MediaRecorder(context)
-        } else {
-            MediaRecorder()
-        }
-        recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
-        recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-        recorder.setAudioSamplingRate(44_100)
-        recorder.setOutputFile(output.absolutePath)
-        recorder.prepare()
+        val recorder = WavVoiceRecorder.create(output)
         recorder.start()
         onRecordedPath(output.absolutePath)
         onRecorder(recorder)
         onRecording(true)
-        onStatus("Recording voice...")
+        onStatus("Recording voice as WAV...")
     }.onFailure { error ->
         onRecorder(null)
         onRecording(false)
@@ -373,22 +366,136 @@ private fun startVoiceRecording(
 }
 
 private fun stopVoiceRecording(
-    recorder: MediaRecorder?,
-    onRecorder: (MediaRecorder?) -> Unit,
+    recorder: WavVoiceRecorder?,
+    onRecorder: (WavVoiceRecorder?) -> Unit,
+    onRecordedPath: (String) -> Unit,
     onRecording: (Boolean) -> Unit,
     onStatus: (String) -> Unit
 ) {
-    runCatching {
-        recorder?.stop()
-    }.onFailure {
-        onStatus("Recording was too short. Try again.")
-    }
-    runCatching { recorder?.release() }
+    val ready = runCatching { recorder?.stop() == true }.getOrDefault(false)
     onRecorder(null)
     onRecording(false)
-    if (recorder != null) {
-        onStatus("Voice clip ready")
+    if (ready) {
+        onStatus("WAV voice clip ready")
+    } else if (recorder != null) {
+        onRecordedPath("")
+        onStatus("Recording was too short. Try again.")
     }
+}
+
+private class WavVoiceRecorder private constructor(
+    private val audioRecord: AudioRecord,
+    private val output: File,
+    private val bufferSize: Int,
+    private val sampleRate: Int,
+    private val channelCount: Int
+) {
+    @Volatile
+    private var running = false
+    private var worker: Thread? = null
+
+    fun start() {
+        RandomAccessFile(output, "rw").use { file ->
+            file.setLength(0)
+            file.write(wavHeader(dataSize = 0, sampleRate = sampleRate, channelCount = channelCount))
+        }
+        audioRecord.startRecording()
+        running = true
+        worker = Thread {
+            RandomAccessFile(output, "rw").use { file ->
+                file.seek(WAV_HEADER_BYTES.toLong())
+                val buffer = ByteArray(bufferSize)
+                while (running) {
+                    val read = audioRecord.read(buffer, 0, buffer.size)
+                    if (read > 0) {
+                        file.write(buffer, 0, read)
+                    }
+                }
+                val dataSize = (file.length() - WAV_HEADER_BYTES).coerceAtLeast(0L)
+                file.seek(0)
+                file.write(wavHeader(dataSize, sampleRate, channelCount))
+            }
+        }.apply {
+            name = "NullXoid-WAV-VoiceRecorder"
+            start()
+        }
+    }
+
+    fun stop(): Boolean {
+        running = false
+        runCatching { audioRecord.stop() }
+        worker?.join(1_500)
+        runCatching { audioRecord.release() }
+        worker?.join(500)
+        val ready = output.exists() && output.length() > WAV_HEADER_BYTES
+        if (!ready) {
+            runCatching { output.delete() }
+        }
+        return ready
+    }
+
+    companion object {
+        private const val SAMPLE_RATE = 44_100
+        private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
+        private const val CHANNEL_COUNT = 1
+        private const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
+
+        @SuppressLint("MissingPermission")
+        fun create(output: File): WavVoiceRecorder {
+            val minBuffer = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, ENCODING)
+            require(minBuffer > 0) { "WAV recording is unavailable on this device." }
+            val bufferSize = maxOf(minBuffer, SAMPLE_RATE / 5)
+            val audioRecord = AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SAMPLE_RATE,
+                CHANNEL_CONFIG,
+                ENCODING,
+                bufferSize
+            )
+            require(audioRecord.state == AudioRecord.STATE_INITIALIZED) {
+                "Could not initialize WAV recording."
+            }
+            return WavVoiceRecorder(audioRecord, output, bufferSize, SAMPLE_RATE, CHANNEL_COUNT)
+        }
+    }
+}
+
+private const val WAV_HEADER_BYTES = 44
+
+private fun wavHeader(dataSize: Long, sampleRate: Int, channelCount: Int): ByteArray {
+    val bitsPerSample = 16
+    val byteRate = sampleRate * channelCount * bitsPerSample / 8
+    val blockAlign = channelCount * bitsPerSample / 8
+    val header = ByteArray(WAV_HEADER_BYTES)
+    fun ascii(offset: Int, value: String) {
+        value.toByteArray(Charsets.US_ASCII).copyInto(header, offset)
+    }
+    ascii(0, "RIFF")
+    writeLeInt(header, 4, 36L + dataSize)
+    ascii(8, "WAVE")
+    ascii(12, "fmt ")
+    writeLeInt(header, 16, 16)
+    writeLeShort(header, 20, 1)
+    writeLeShort(header, 22, channelCount)
+    writeLeInt(header, 24, sampleRate.toLong())
+    writeLeInt(header, 28, byteRate.toLong())
+    writeLeShort(header, 32, blockAlign)
+    writeLeShort(header, 34, bitsPerSample)
+    ascii(36, "data")
+    writeLeInt(header, 40, dataSize)
+    return header
+}
+
+private fun writeLeInt(target: ByteArray, offset: Int, value: Long) {
+    target[offset] = (value and 0xff).toByte()
+    target[offset + 1] = ((value shr 8) and 0xff).toByte()
+    target[offset + 2] = ((value shr 16) and 0xff).toByte()
+    target[offset + 3] = ((value shr 24) and 0xff).toByte()
+}
+
+private fun writeLeShort(target: ByteArray, offset: Int, value: Int) {
+    target[offset] = (value and 0xff).toByte()
+    target[offset + 1] = ((value shr 8) and 0xff).toByte()
 }
 
 @Composable

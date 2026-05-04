@@ -62,6 +62,8 @@ class AndroidProductIaTest {
         assertFalse(source.contains("2. Configure"))
         assertFalse(source.contains("Text(\"Gallery\""))
         assertTrue(nav.contains("onRunStoreAddon = vm::runStoreAddon"))
+        assertTrue(nav.contains("LaunchedEffect(state.auth.authenticated)"))
+        assertTrue(nav.contains("if (state.auth.authenticated) vm.refreshStore()"))
     }
 
     @Test
@@ -135,10 +137,18 @@ class AndroidProductIaTest {
         val manifest = File("src/main/AndroidManifest.xml").readText()
         val api = File("src/main/java/com/nullxoid/android/data/api/NullXoidApi.kt").readText()
         val store = File("src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt").readText()
+        val viewModel = File("src/main/java/com/nullxoid/android/ui/NullXoidViewModel.kt").readText()
 
         assertTrue(manifest.contains("android.permission.RECORD_AUDIO"))
         assertTrue(api.contains("/artifacts/upload"))
         assertTrue(store.contains("store-video-audio-\$mode"))
+        assertTrue(store.contains("AudioRecord"))
+        assertTrue(store.contains(".wav"))
+        assertTrue(store.contains("WAV voice clip ready"))
+        assertTrue(viewModel.contains("voice-note.wav"))
+        assertTrue(viewModel.contains("audio/wav"))
+        assertFalse(viewModel.contains("voice-note.m4a"))
+        assertFalse(viewModel.contains("audio/mp4"))
         assertFalse(store.contains("workflow path"))
         assertFalse(store.contains("provider config"))
     }

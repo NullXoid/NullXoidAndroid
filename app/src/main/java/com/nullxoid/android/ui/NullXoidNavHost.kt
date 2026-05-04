@@ -219,6 +219,9 @@ fun NullXoidApp(
                     )
                 }
                 composable(Routes.Store) {
+                    LaunchedEffect(state.auth.authenticated) {
+                        if (state.auth.authenticated) vm.refreshStore()
+                    }
                     StoreScreen(
                         state = state,
                         initialAddonId = createInitialAddonId,
