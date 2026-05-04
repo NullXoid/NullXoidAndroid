@@ -755,9 +755,16 @@ class NullXoidViewModel(
             runCatching {
                 val previewPath = safePreviewPath(item)
                 when {
-                    previewPath.isNotBlank() -> repo.storeBytesAtPath(previewPath)
-                    item.mimeType.startsWith("image/") -> repo.storeArtifactBytes(artifactId)
-                    item.mimeType.startsWith("video/") -> repo.storeArtifactBytes(artifactId)
+                    previewPath.isNotBlank() -> runCatching { repo.storeBytesAtPath(previewPath) }
+                        .getOrElse {
+                            if (item.mimeType.startsWith("image/") || item.mimeType.startsWith("video/")) {
+                                repo.storeArtifactBytes(artifactId)
+                            } else {
+                                ByteArray(0)
+                            }
+                        }
+                    item.mimeType.startsWith("image/") || item.mimeType.startsWith("video/") ->
+                        repo.storeArtifactBytes(artifactId)
                     else -> ByteArray(0)
                 }
             }.onSuccess { bytes ->

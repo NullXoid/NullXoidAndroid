@@ -194,7 +194,9 @@ class AndroidProductIaTest {
         val store = File("src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt").readText()
         val viewModel = File("src/main/java/com/nullxoid/android/ui/NullXoidViewModel.kt").readText()
 
-        assertTrue(viewModel.contains("item.mimeType.startsWith(\"video/\") -> repo.storeArtifactBytes(artifactId)"))
+        assertTrue(viewModel.contains("repo.storeBytesAtPath(previewPath)"))
+        assertTrue(viewModel.contains("repo.storeArtifactBytes(artifactId)"))
+        assertTrue(viewModel.contains("item.mimeType.startsWith(\"image/\") || item.mimeType.startsWith(\"video/\")"))
         assertTrue(store.contains("MediaMetadataRetriever"))
         assertTrue(store.contains("ByteArrayVideoDataSource"))
         assertTrue(store.contains("decodeVideoFramePreview"))
