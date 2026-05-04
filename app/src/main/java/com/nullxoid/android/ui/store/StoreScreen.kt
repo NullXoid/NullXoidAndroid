@@ -5,6 +5,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.AudioFormat
+import android.media.MediaDataSource
+import android.media.MediaMetadataRetriever
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.widget.MediaController
@@ -861,8 +863,15 @@ fun StoreGalleryCard(
 
 @Composable
 private fun StorePreviewBox(item: StoreArtifactRef, bytes: ByteArray?) {
-    val imageBitmap = remember(bytes) {
-        bytes?.let { runCatching { BitmapFactory.decodeByteArray(it, 0, it.size).asImageBitmap() }.getOrNull() }
+    val previewBitmap = remember(item.artifactId, item.mimeType, bytes) {
+        bytes?.let {
+            runCatching {
+                when {
+                    item.mimeType.startsWith("video/") -> decodeVideoFramePreview(it)?.asImageBitmap()
+                    else -> BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap()
+                }
+            }.getOrNull()
+        }
     }
     Box(
         modifier = Modifier
@@ -871,17 +880,47 @@ private fun StorePreviewBox(item: StoreArtifactRef, bytes: ByteArray?) {
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)),
         contentAlignment = Alignment.Center
     ) {
-        if (imageBitmap != null) {
+        if (previewBitmap != null) {
             Image(
-                bitmap = imageBitmap,
+                bitmap = previewBitmap,
                 contentDescription = "${artifactTypeLabel(item)} preview",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
         } else {
-            Text(artifactTypeLabel(item), style = MaterialTheme.typography.titleMedium)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(artifactTypeLabel(item), style = MaterialTheme.typography.titleMedium)
+                if (item.mimeType.startsWith("video/")) {
+                    Text("Preview loading", style = MaterialTheme.typography.bodySmall)
+                }
+            }
         }
     }
+}
+
+private fun decodeVideoFramePreview(bytes: ByteArray) =
+    MediaMetadataRetriever().run {
+        try {
+            setDataSource(ByteArrayVideoDataSource(bytes))
+            getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        } finally {
+            release()
+        }
+    }
+
+private class ByteArrayVideoDataSource(
+    private val bytes: ByteArray
+) : MediaDataSource() {
+    override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
+        if (position < 0 || position >= bytes.size) return -1
+        val length = minOf(size, bytes.size - position.toInt())
+        bytes.copyInto(destination = buffer, destinationOffset = offset, startIndex = position.toInt(), endIndex = position.toInt() + length)
+        return length
+    }
+
+    override fun getSize(): Long = bytes.size.toLong()
+
+    override fun close() = Unit
 }
 
 @Composable

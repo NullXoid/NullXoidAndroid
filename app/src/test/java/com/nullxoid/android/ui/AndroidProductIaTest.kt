@@ -188,4 +188,17 @@ class AndroidProductIaTest {
         assertTrue(store.contains("start()"))
         assertFalse(store.contains("setVideoPath(videoFile.absolutePath)"))
     }
+
+    @Test
+    fun videoGalleryCardsUseSafeFramePreviews() {
+        val store = File("src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt").readText()
+        val viewModel = File("src/main/java/com/nullxoid/android/ui/NullXoidViewModel.kt").readText()
+
+        assertTrue(viewModel.contains("item.mimeType.startsWith(\"video/\") -> repo.storeArtifactBytes(artifactId)"))
+        assertTrue(store.contains("MediaMetadataRetriever"))
+        assertTrue(store.contains("ByteArrayVideoDataSource"))
+        assertTrue(store.contains("decodeVideoFramePreview"))
+        assertTrue(store.contains("Preview loading"))
+        assertFalse(store.contains("setDataSource(videoFile.absolutePath)"))
+    }
 }
