@@ -1,5 +1,6 @@
 package com.nullxoid.android.ui
 
+import android.os.SystemClock
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -23,6 +24,10 @@ enum class MainTab {
     Settings
 }
 
+private object MainTabSwipeState {
+    var lastNavigationAtMs: Long = 0
+}
+
 fun Modifier.mainTabSwipeNavigation(
     selected: MainTab,
     onOpenCreate: () -> Unit,
@@ -37,6 +42,8 @@ fun Modifier.mainTabSwipeNavigation(
         onDragCancel = { horizontalDrag = 0f },
         onDragEnd = {
             if (abs(horizontalDrag) >= 120f) {
+                val now = SystemClock.elapsedRealtime()
+                if (now - MainTabSwipeState.lastNavigationAtMs < 650L) return@detectHorizontalDragGestures
                 val tabs = MainTab.entries
                 val index = tabs.indexOf(selected)
                 val nextIndex = if (horizontalDrag < 0) index + 1 else index - 1
@@ -47,6 +54,7 @@ fun Modifier.mainTabSwipeNavigation(
                     MainTab.Settings -> onOpenSettings()
                     null -> Unit
                 }
+                MainTabSwipeState.lastNavigationAtMs = now
             }
         }
     )

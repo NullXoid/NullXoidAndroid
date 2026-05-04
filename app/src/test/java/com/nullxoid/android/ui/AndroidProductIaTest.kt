@@ -116,6 +116,8 @@ class AndroidProductIaTest {
         assertTrue(bottomNav.contains("mainTabSwipeNavigation"))
         assertTrue(bottomNav.contains("detectHorizontalDragGestures"))
         assertTrue(bottomNav.contains("MainTab.entries"))
+        assertTrue(bottomNav.contains("MainTabSwipeState"))
+        assertTrue(bottomNav.contains("lastNavigationAtMs"))
 
         listOf(
             "src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt",
