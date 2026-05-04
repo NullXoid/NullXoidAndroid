@@ -55,6 +55,9 @@ class AndroidProductIaTest {
         assertTrue(source.contains("store-job-status-card"))
         assertTrue(source.contains("store-prompt"))
         assertTrue(source.contains("Generate with approval"))
+        assertTrue(source.contains("Auto audio"))
+        assertTrue(source.contains("Record voice"))
+        assertTrue(source.contains("No audio"))
         assertFalse(source.contains("1. Choose"))
         assertFalse(source.contains("2. Configure"))
         assertFalse(source.contains("Text(\"Gallery\""))
@@ -125,5 +128,18 @@ class AndroidProductIaTest {
         ).forEach { marker ->
             assertFalse("Unexpected leak marker: $marker", source.contains(marker))
         }
+    }
+
+    @Test
+    fun voiceRecordingUsesAndroidPermissionAndSafeArtifactUpload() {
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+        val api = File("src/main/java/com/nullxoid/android/data/api/NullXoidApi.kt").readText()
+        val store = File("src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt").readText()
+
+        assertTrue(manifest.contains("android.permission.RECORD_AUDIO"))
+        assertTrue(api.contains("/artifacts/upload"))
+        assertTrue(store.contains("store-video-audio-\$mode"))
+        assertFalse(store.contains("workflow path"))
+        assertFalse(store.contains("provider config"))
     }
 }

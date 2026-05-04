@@ -235,6 +235,11 @@ class NullXoidRepository(
 
     suspend fun storeArtifactBytes(artifactId: String): ByteArray = api.getBytes("/artifacts/$artifactId")
 
+    suspend fun uploadStoreAudio(filename: String, mimeType: String, bytes: ByteArray): String {
+        val response = api.uploadArtifact(filename, mimeType, bytes)
+        return response.items.firstOrNull()?.id.orEmpty()
+    }
+
     suspend fun storeBytesAtPath(path: String): ByteArray {
         require(path.startsWith("/")) { "Only backend-relative artifact routes are supported." }
         require(!path.startsWith("//") && !path.contains("..")) { "Unsafe artifact route." }
@@ -249,7 +254,10 @@ class NullXoidRepository(
         capability: String = "",
         durationMs: Int = 4000,
         format: String = "glb",
-        jobType: String = ""
+        jobType: String = "",
+        audioMode: String = "none",
+        audioArtifactId: String = "",
+        audioPrompt: String = ""
     ): StoreActionResponse =
         api.runStoreAction(
             addonId,
@@ -262,6 +270,9 @@ class NullXoidRepository(
                 format = format,
                 capability = capability,
                 jobType = jobType,
+                audioMode = audioMode,
+                audioArtifactId = audioArtifactId,
+                audioPrompt = audioPrompt,
                 waitForApproval = false
             )
         )

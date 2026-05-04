@@ -1,6 +1,13 @@
 package com.nullxoid.android.ui.store
 
+import android.Manifest
+import android.content.Context
 import android.graphics.BitmapFactory
+import android.media.MediaRecorder
+import android.os.Build
+import android.widget.VideoView
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -54,17 +61,21 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import com.nullxoid.android.data.model.StoreAddon
 import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.ui.AppUiState
 import com.nullxoid.android.ui.MainBottomNavigation
 import com.nullxoid.android.ui.MainTab
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +87,7 @@ fun StoreScreen(
     onOpenAsk: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectAddon: (String) -> Unit,
-    onRunStoreAddon: (String, String, String, String, String, String, Int, String) -> Unit,
+    onRunStoreAddon: (String, String, String, String, String, String, Int, String, String, String, String) -> Unit,
     onSaveArtifact: (String, String) -> Unit,
     onShareArtifact: (String, String) -> Unit,
     onViewArtifact: (StoreArtifactRef) -> Unit,
@@ -127,6 +138,30 @@ fun StoreScreen(
         )
     }
     val mediaKind = mediaKindForAddon(selectedAddon?.id.orEmpty())
+    val context = LocalContext.current
+    var audioMode by remember(selectedAddon?.id) {
+        mutableStateOf(if (mediaKindForAddon(selectedAddon?.id.orEmpty()) == "video") "auto_generated" else "none")
+    }
+    var audioPrompt by remember(selectedAddon?.id) { mutableStateOf("") }
+    var recordedAudioPath by remember(selectedAddon?.id) { mutableStateOf("") }
+    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    var recording by remember { mutableStateOf(false) }
+    var audioStatus by remember(selectedAddon?.id) { mutableStateOf("") }
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            startVoiceRecording(
+                context = context,
+                onRecorder = { recorder = it },
+                onRecordedPath = { recordedAudioPath = it },
+                onRecording = { recording = it },
+                onStatus = { audioStatus = it }
+            )
+        } else {
+            audioStatus = "Microphone permission denied."
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -199,6 +234,36 @@ fun StoreScreen(
                         onSelectProfile = { selectedProfileId = it },
                         onPromptChange = { prompt = it },
                         onSizeChange = { sizeDraft = it },
+                        audioMode = audioMode,
+                        audioPrompt = audioPrompt,
+                        recordedAudioPath = recordedAudioPath,
+                        recording = recording,
+                        audioStatus = audioStatus,
+                        onAudioModeChange = { audioMode = it },
+                        onAudioPromptChange = { audioPrompt = it },
+                        onStartRecording = {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                                android.content.pm.PackageManager.PERMISSION_GRANTED
+                            ) {
+                                startVoiceRecording(
+                                    context = context,
+                                    onRecorder = { recorder = it },
+                                    onRecordedPath = { recordedAudioPath = it },
+                                    onRecording = { recording = it },
+                                    onStatus = { audioStatus = it }
+                                )
+                            } else {
+                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        },
+                        onStopRecording = {
+                            stopVoiceRecording(
+                                recorder = recorder,
+                                onRecorder = { recorder = it },
+                                onRecording = { recording = it },
+                                onStatus = { audioStatus = it }
+                            )
+                        },
                         onRun = {
                             val selectedProfile = profiles.firstOrNull {
                                 it.id == selectedProfileId.ifBlank { profiles.firstOrNull()?.id.orEmpty() }
@@ -212,7 +277,10 @@ fun StoreScreen(
                                     sizeDraft,
                                     selectedProfile?.id.orEmpty(),
                                     selectedProfile?.durationMs ?: 0,
-                                    selectedProfile?.format.orEmpty()
+                                    selectedProfile?.format.orEmpty(),
+                                    if (mediaKind == "video") audioMode else "none",
+                                    recordedAudioPath,
+                                    audioPrompt.ifBlank { "Generate synchronized audio that matches the video prompt." }
                                 )
                             }
                         }
@@ -267,6 +335,59 @@ fun StoreScreen(
             onSave = { onSaveArtifact(artifact.artifactId, artifact.mimeType) },
             onShare = { onShareArtifact(artifact.artifactId, artifact.mimeType) }
         )
+    }
+}
+
+private fun startVoiceRecording(
+    context: Context,
+    onRecorder: (MediaRecorder?) -> Unit,
+    onRecordedPath: (String) -> Unit,
+    onRecording: (Boolean) -> Unit,
+    onStatus: (String) -> Unit
+) {
+    val dir = File(context.cacheDir, "store_voice_inputs").apply { mkdirs() }
+    val output = File(dir, "voice-${System.currentTimeMillis()}.m4a")
+    runCatching {
+        @Suppress("DEPRECATION")
+        val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            MediaRecorder(context)
+        } else {
+            MediaRecorder()
+        }
+        recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+        recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+        recorder.setAudioSamplingRate(44_100)
+        recorder.setOutputFile(output.absolutePath)
+        recorder.prepare()
+        recorder.start()
+        onRecordedPath(output.absolutePath)
+        onRecorder(recorder)
+        onRecording(true)
+        onStatus("Recording voice...")
+    }.onFailure { error ->
+        onRecorder(null)
+        onRecording(false)
+        onStatus(error.message ?: "Could not start recording.")
+    }
+}
+
+private fun stopVoiceRecording(
+    recorder: MediaRecorder?,
+    onRecorder: (MediaRecorder?) -> Unit,
+    onRecording: (Boolean) -> Unit,
+    onStatus: (String) -> Unit
+) {
+    runCatching {
+        recorder?.stop()
+    }.onFailure {
+        onStatus("Recording was too short. Try again.")
+    }
+    runCatching { recorder?.release() }
+    onRecorder(null)
+    onRecording(false)
+    if (recorder != null) {
+        onStatus("Voice clip ready")
     }
 }
 
@@ -330,9 +451,18 @@ private fun StoreAddonPanel(
     prompt: String,
     sizeDraft: String,
     loading: Boolean,
+    audioMode: String,
+    audioPrompt: String,
+    recordedAudioPath: String,
+    recording: Boolean,
+    audioStatus: String,
     onSelectProfile: (String) -> Unit,
     onPromptChange: (String) -> Unit,
     onSizeChange: (String) -> Unit,
+    onAudioModeChange: (String) -> Unit,
+    onAudioPromptChange: (String) -> Unit,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit,
     onRun: () -> Unit
 ) {
     Card(
@@ -417,15 +547,98 @@ private fun StoreAddonPanel(
                 }
                 AssistChip(onClick = {}, label = { Text("Approval required") })
             }
+            if (mediaKind == "video") {
+                VideoAudioOptions(
+                    audioMode = audioMode,
+                    audioPrompt = audioPrompt,
+                    recordedAudioPath = recordedAudioPath,
+                    recording = recording,
+                    status = audioStatus,
+                    onAudioModeChange = onAudioModeChange,
+                    onAudioPromptChange = onAudioPromptChange,
+                    onStartRecording = onStartRecording,
+                    onStopRecording = onStopRecording
+                )
+            }
+            val missingRecordedAudio = mediaKind == "video" &&
+                audioMode == "recorded_voice" &&
+                recordedAudioPath.isBlank()
             Button(
                 modifier = Modifier
                     .height(52.dp)
                     .testTag("store-${addon?.id ?: "addon"}-generate"),
-                enabled = !loading && addon != null,
+                enabled = !loading && addon != null && !recording && !missingRecordedAudio,
                 onClick = onRun
             ) {
                 Text(if (loading) "Checking job..." else "Generate with approval")
             }
+        }
+    }
+}
+
+@Composable
+private fun VideoAudioOptions(
+    audioMode: String,
+    audioPrompt: String,
+    recordedAudioPath: String,
+    recording: Boolean,
+    status: String,
+    onAudioModeChange: (String) -> Unit,
+    onAudioPromptChange: (String) -> Unit,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Audio", style = MaterialTheme.typography.titleSmall)
+        listOf(
+            "auto_generated" to "Auto audio",
+            "recorded_voice" to "Record voice",
+            "none" to "No audio"
+        ).forEach { (mode, label) ->
+            FilterChip(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("store-video-audio-$mode"),
+                selected = audioMode == mode,
+                onClick = { onAudioModeChange(mode) },
+                label = {
+                    Text(
+                        when (mode) {
+                            "auto_generated" -> "$label - match the prompt"
+                            "recorded_voice" -> "$label - private voice input"
+                            else -> label
+                        }
+                    )
+                }
+            )
+        }
+        if (audioMode == "auto_generated") {
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = audioPrompt,
+                onValueChange = onAudioPromptChange,
+                label = { Text("Audio direction") },
+                placeholder = { Text("Match the scene with synchronized sound") },
+                minLines = 2
+            )
+        }
+        if (audioMode == "recorded_voice") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    enabled = !recording,
+                    onClick = onStartRecording
+                ) { Text("Start recording") }
+                OutlinedButton(
+                    enabled = recording,
+                    onClick = onStopRecording
+                ) { Text("Stop") }
+            }
+            val readyText = if (recordedAudioPath.isNotBlank()) "Voice clip ready" else "No voice clip yet"
+            Text(
+                status.ifBlank { readyText },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -564,6 +777,7 @@ fun StoreMediaViewer(
     onSave: () -> Unit,
     onShare: () -> Unit
 ) {
+    val context = LocalContext.current
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -593,8 +807,14 @@ fun StoreMediaViewer(
                         loading -> Text("Opening...", color = Color.White)
                         error.isNotBlank() -> Text(error, color = Color.White)
                         artifact.mimeType.startsWith("image/") && bytes.isNotEmpty() -> ZoomableImage(bytes)
+                        artifact.mimeType.startsWith("video/") && bytes.isNotEmpty() ->
+                            InlineVideoPlayer(
+                                context = context,
+                                artifactId = artifact.artifactId,
+                                bytes = bytes
+                            )
                         artifact.mimeType.startsWith("video/") ->
-                            Text("Video is ready. Use Save or Share to open it with a player.", color = Color.White)
+                            Text("Video is ready. Save or Share to open it with a player.", color = Color.White)
                         else -> Text("Preview is not available yet.", color = Color.White)
                     }
                 }
@@ -606,6 +826,33 @@ fun StoreMediaViewer(
             }
         }
     }
+}
+
+@Composable
+private fun InlineVideoPlayer(
+    context: Context,
+    artifactId: String,
+    bytes: ByteArray
+) {
+    val videoFile = remember(artifactId, bytes) {
+        val dir = File(context.cacheDir, "shared_store_artifacts").apply { mkdirs() }
+        File(dir, "$artifactId.mp4").also { it.writeBytes(bytes) }
+    }
+    AndroidView(
+        modifier = Modifier.fillMaxWidth(),
+        factory = { viewContext ->
+            VideoView(viewContext).apply {
+                setVideoPath(videoFile.absolutePath)
+                setOnPreparedListener { mediaPlayer ->
+                    mediaPlayer.isLooping = false
+                    start()
+                }
+            }
+        },
+        update = { view ->
+            view.setVideoPath(videoFile.absolutePath)
+        }
+    )
 }
 
 @Composable

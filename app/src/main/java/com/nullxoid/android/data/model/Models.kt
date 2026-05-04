@@ -352,7 +352,23 @@ data class StoreActionRequest(
     val format: String = "glb",
     val capability: String = "",
     val jobType: String = "",
+    val audioMode: String = "none",
+    val audioArtifactId: String = "",
+    val audioPrompt: String = "",
     val waitForApproval: Boolean = false
+)
+
+@Serializable
+data class UploadedArtifactItem(
+    val id: String = "",
+    @SerialName("mime_type") val mimeType: String = "",
+    @SerialName("artifact_url") val artifactUrl: String = "",
+    @SerialName("thumb_url") val thumbUrl: String = ""
+)
+
+@Serializable
+data class UploadArtifactResponse(
+    val items: List<UploadedArtifactItem> = emptyList()
 )
 
 @Serializable

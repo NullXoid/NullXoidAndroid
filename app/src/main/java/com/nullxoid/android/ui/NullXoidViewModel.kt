@@ -591,7 +591,10 @@ class NullXoidViewModel(
             imageSize = imageSize,
             jobType = "",
             durationMs = 4000,
-            format = "glb"
+            format = "glb",
+            audioMode = "none",
+            recordedAudioPath = "",
+            audioPrompt = ""
         )
     }
 
@@ -603,11 +606,21 @@ class NullXoidViewModel(
         imageSize: String,
         jobType: String,
         durationMs: Int,
-        format: String
+        format: String,
+        audioMode: String,
+        recordedAudioPath: String,
+        audioPrompt: String
     ) {
         val cleanPrompt = prompt.trim()
         if (cleanPrompt.isBlank()) {
             _state.value = _state.value.copy(error = "Prompt required")
+            return
+        }
+        val cleanAudioMode = audioMode.trim().lowercase().replace("-", "_").let {
+            if (it in setOf("recorded_voice", "auto_generated", "none")) it else "none"
+        }
+        if (cleanAudioMode == "recorded_voice" && recordedAudioPath.isBlank()) {
+            _state.value = _state.value.copy(error = "Record a voice clip before generating with recorded voice.")
             return
         }
         viewModelScope.launch {
@@ -617,6 +630,19 @@ class NullXoidViewModel(
                 error = null
             )
             runCatching {
+                val audioArtifactId = if (cleanAudioMode == "recorded_voice") {
+                    val audioFile = File(recordedAudioPath)
+                    require(audioFile.exists() && audioFile.length() > 0L) {
+                        "Record a voice clip before generating with recorded voice."
+                    }
+                    val bytes = withContext(Dispatchers.IO) { audioFile.readBytes() }
+                    val uploaded = repo.uploadStoreAudio("voice-note.m4a", "audio/mp4", bytes)
+                    require(uploaded.isNotBlank()) { "Voice upload failed." }
+                    runCatching { audioFile.delete() }
+                    uploaded
+                } else {
+                    ""
+                }
                 repo.runStoreAction(
                     addonId = addonId,
                     action = action,
@@ -625,7 +651,10 @@ class NullXoidViewModel(
                     capability = capability,
                     durationMs = durationMs,
                     format = format,
-                    jobType = jobType
+                    jobType = jobType,
+                    audioMode = cleanAudioMode,
+                    audioArtifactId = audioArtifactId,
+                    audioPrompt = audioPrompt.trim()
                 )
             }.onSuccess { result ->
                 val storeJobId = result.storeJobId ?: result.jobId.orEmpty()

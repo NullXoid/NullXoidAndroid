@@ -64,4 +64,22 @@ class StoreAsyncJobContractTest {
         assertEquals("image-standard", request.jobType)
         assertTrue(request.capability.startsWith("suite.media."))
     }
+
+    @Test
+    fun videoStoreActionCanSendSafeAudioArtifactMetadata() {
+        val request = StoreActionRequest(
+            prompt = "android video with voice",
+            capability = "suite.media.video.generate",
+            jobType = "video-short",
+            audioMode = "recorded_voice",
+            audioArtifactId = "artifact-safe-voice",
+            audioPrompt = "Match the scene"
+        )
+
+        assertEquals("recorded_voice", request.audioMode)
+        assertEquals("artifact-safe-voice", request.audioArtifactId)
+        assertFalse(request.audioArtifactId.contains("://"))
+        assertFalse(request.audioArtifactId.contains("\\"))
+        assertFalse(request.audioArtifactId.contains("/"))
+    }
 }

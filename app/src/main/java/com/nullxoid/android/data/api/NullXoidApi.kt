@@ -25,6 +25,7 @@ import com.nullxoid.android.data.model.StoreActionRequest
 import com.nullxoid.android.data.model.StoreActionResponse
 import com.nullxoid.android.data.model.StoreCatalogResponse
 import com.nullxoid.android.data.model.StoreGalleryResponse
+import com.nullxoid.android.data.model.UploadArtifactResponse
 import com.nullxoid.android.data.model.WorkspaceListResponse
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -34,6 +35,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -76,6 +78,21 @@ class NullXoidApi(
             HttpClient.okHttp.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) throw ApiException(resp.code, resp.body?.string().orEmpty())
                 resp.body?.bytes() ?: ByteArray(0)
+            }
+        }
+
+    suspend fun uploadArtifact(filename: String, mimeType: String, bytes: ByteArray): UploadArtifactResponse =
+        withContext(Dispatchers.IO) {
+            val mediaType = mimeType.ifBlank { "application/octet-stream" }.toMediaType()
+            val body = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("files", filename, bytes.toRequestBody(mediaType))
+                .build()
+            val req = Request.Builder().url(url("/artifacts/upload")).post(body).build()
+            HttpClient.okHttp.newCall(req).execute().use { resp ->
+                val raw = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw ApiException(resp.code, raw)
+                json.decodeFromString<UploadArtifactResponse>(raw)
             }
         }
 
