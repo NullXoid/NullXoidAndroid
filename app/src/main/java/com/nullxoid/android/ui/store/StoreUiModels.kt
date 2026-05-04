@@ -203,3 +203,27 @@ fun safePreviewPath(item: StoreArtifactRef): String =
     listOf(item.thumbnailUrl, item.posterUrl, item.previewUrl, item.modelPreviewUrl)
         .firstOrNull { it.startsWith("/") }
         .orEmpty()
+
+fun isActionableArtifact(item: StoreArtifactRef): Boolean =
+    item.artifactId.isNotBlank() && item.mimeType.isNotBlank()
+
+fun previewLoadAllowed(item: StoreArtifactRef): Boolean =
+    isActionableArtifact(item) && safePreviewPath(item).isNotBlank()
+
+fun isRenderableLatestResult(item: StoreArtifactRef): Boolean {
+    if (!isActionableArtifact(item)) return false
+    val status = item.status.lowercase()
+    return status.isBlank() || status in setOf("ready", "completed", "complete", "stored")
+}
+
+fun latestRenderableArtifact(items: List<StoreArtifactRef>): StoreArtifactRef? =
+    items.firstOrNull(::isRenderableLatestResult)
+
+fun stableArtifactListKey(item: StoreArtifactRef, index: Int, prefix: String): String {
+    val id = item.artifactId.ifBlank {
+        listOf(item.thumbnailUrl, item.posterUrl, item.previewUrl, item.modelPreviewUrl, item.createdAt)
+            .firstOrNull { it.isNotBlank() }
+            ?: "blank"
+    }
+    return "$prefix-$index-$id"
+}

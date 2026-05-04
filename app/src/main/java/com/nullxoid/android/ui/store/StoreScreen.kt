@@ -210,7 +210,7 @@ fun StoreScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item {
+            item(key = "store-header") {
                 Text(
                     "Create",
                     style = MaterialTheme.typography.headlineSmall,
@@ -224,9 +224,9 @@ fun StoreScreen(
             }
 
             if (addons.isEmpty()) {
-                item { EmptyStoreCard(state.storeLoading) }
+                item(key = "store-empty") { EmptyStoreCard(state.storeLoading) }
             } else {
-                item {
+                item(key = "store-media-selector") {
                     StoreMediaSelector(
                         addons = addons,
                         selectedAddonId = selectedAddon?.id.orEmpty(),
@@ -237,7 +237,7 @@ fun StoreScreen(
                         }
                     )
                 }
-                item {
+                item(key = "store-addon-panel-${selectedAddon?.id.orEmpty()}") {
                     StoreAddonPanel(
                         addon = selectedAddon,
                         mediaKind = mediaKind,
@@ -302,18 +302,18 @@ fun StoreScreen(
                         }
                     )
                 }
-                item {
+                item(key = "store-job-status-${state.storeAction?.storeJobId ?: state.activeStoreJobId}") {
                     StoreJobStatusCard(state)
                 }
-                item {
+                item(key = "store-latest-title") {
                     Text(
                         "Latest result",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                item {
-                    val latest = state.storeGallery.items.firstOrNull()
+                val latest = latestRenderableArtifact(state.storeGallery.items)
+                item(key = latest?.let { stableArtifactListKey(it, 0, "store-latest") } ?: "store-latest-empty") {
                     if (latest == null) {
                         Text(
                             "No recent result yet. Gallery will show your private media after generation.",
@@ -333,7 +333,7 @@ fun StoreScreen(
                     }
                 }
                 if (state.storeSaveStatus.isNotBlank()) {
-                    item {
+                    item(key = "store-save-status") {
                         Text(state.storeSaveStatus, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -823,8 +823,11 @@ fun StoreGalleryCard(
     onSave: () -> Unit,
     onShare: () -> Unit
 ) {
-    LaunchedEffect(item.artifactId, item.thumbnailUrl, item.posterUrl, item.previewUrl) {
-        onLoadPreview(item)
+    val actionsEnabled = isActionableArtifact(item)
+    LaunchedEffect(item.artifactId, item.thumbnailUrl, item.posterUrl, item.previewUrl, item.modelPreviewUrl) {
+        if (previewLoadAllowed(item)) {
+            onLoadPreview(item)
+        }
     }
     var showDetails by remember(item.artifactId) { mutableStateOf(false) }
     Card(
@@ -840,9 +843,9 @@ fun StoreGalleryCard(
                 AssistChip(onClick = {}, label = { Text(item.status.ifBlank { "ready" }) })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onView) { Text("View") }
-                OutlinedButton(onClick = onSave) { Text("Save to device") }
-                OutlinedButton(onClick = onShare) { Text("Share") }
+                Button(enabled = actionsEnabled, onClick = onView) { Text("View") }
+                OutlinedButton(enabled = actionsEnabled, onClick = onSave) { Text("Save to device") }
+                OutlinedButton(enabled = actionsEnabled, onClick = onShare) { Text("Share") }
             }
             OutlinedButton(onClick = { showDetails = !showDetails }) {
                 Text(if (showDetails) "Hide details" else "Details")

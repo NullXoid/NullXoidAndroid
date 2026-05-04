@@ -115,4 +115,59 @@ class StorePrereleasePolishTest {
         assertFalse(item.toString().contains("workflow"))
         assertFalse(item.toString().contains("token"))
     }
+
+    @Test
+    fun pendingOrBlankArtifactsAreNotLatestResults() {
+        val pendingPlaceholder = StoreArtifactRef(
+            artifactId = "",
+            mimeType = "",
+            status = "pending_approval"
+        )
+        val completed = StoreArtifactRef(
+            artifactId = "artifact-ready",
+            mimeType = "image/png",
+            status = "ready"
+        )
+
+        assertFalse(isRenderableLatestResult(pendingPlaceholder))
+        assertEquals(completed, latestRenderableArtifact(listOf(pendingPlaceholder, completed)))
+    }
+
+    @Test
+    fun previewLoadingRequiresSafePreviewPathAndArtifactIdentity() {
+        val blankPath = StoreArtifactRef(
+            artifactId = "artifact-ready",
+            mimeType = "image/png",
+            status = "ready"
+        )
+        val blankArtifact = blankPath.copy(
+            artifactId = "",
+            thumbnailUrl = "/artifacts/artifact-ready/thumb"
+        )
+        val safe = blankPath.copy(thumbnailUrl = "/artifacts/artifact-ready/thumb")
+
+        assertFalse(previewLoadAllowed(blankPath))
+        assertFalse(previewLoadAllowed(blankArtifact))
+        assertTrue(previewLoadAllowed(safe))
+    }
+
+    @Test
+    fun blankArtifactOrMimeDisablesArtifactActions() {
+        assertFalse(isActionableArtifact(StoreArtifactRef(artifactId = "", mimeType = "image/png")))
+        assertFalse(isActionableArtifact(StoreArtifactRef(artifactId = "artifact-ready", mimeType = "")))
+        assertTrue(isActionableArtifact(StoreArtifactRef(artifactId = "artifact-ready", mimeType = "image/png")))
+    }
+
+    @Test
+    fun artifactListKeysRemainUniqueForBlankOrDuplicateIds() {
+        val first = StoreArtifactRef(artifactId = "artifact-duplicate", mimeType = "image/png")
+        val second = StoreArtifactRef(artifactId = "artifact-duplicate", mimeType = "image/png")
+        val blankA = StoreArtifactRef(createdAt = "2026-05-04T12:00:00Z")
+        val blankB = StoreArtifactRef(createdAt = "2026-05-04T12:00:00Z")
+
+        val keys = listOf(first, second, blankA, blankB)
+            .mapIndexed { index, item -> stableArtifactListKey(item, index, "gallery") }
+
+        assertEquals(keys.size, keys.toSet().size)
+    }
 }

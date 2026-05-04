@@ -127,7 +127,7 @@ fun GalleryScreen(
                     )
                 }
             } else {
-                itemsIndexed(visibleItems, key = { _, item -> item.artifactId }) { index, item ->
+                itemsIndexed(visibleItems, key = { index, item -> stableArtifactListKey(item, index, "gallery") }) { index, item ->
                     StoreGalleryCard(
                         item = item,
                         title = safeArtifactTitle(item, index),
