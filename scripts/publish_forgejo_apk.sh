@@ -11,6 +11,7 @@ APK_URL="${APK_URL:-}"
 VERSION_TAG="${VERSION_TAG:-}"
 VERSION_NAME="${VERSION_NAME:-}"
 LATEST_TAG="${LATEST_TAG:-latest-debug}"
+PUBLISH_LATEST="${PUBLISH_LATEST:-true}"
 TARGET_COMMITISH="${TARGET_COMMITISH:-$(git rev-parse HEAD 2>/dev/null || true)}"
 
 log() {
@@ -170,8 +171,12 @@ main() {
     VERSION_NAME="Version ${VERSION_TAG#v0.1.}"
   fi
   publish_release "$VERSION_TAG" "$VERSION_NAME" "Manual Forgejo debug APK release for ${TARGET_COMMITISH}."
-  publish_release "$LATEST_TAG" "Latest Debug APK" "Moving Forgejo debug APK pointer for ${TARGET_COMMITISH}."
-  log "published $APK_NAME to Forgejo releases: $VERSION_TAG and $LATEST_TAG"
+  if [ "$PUBLISH_LATEST" = "true" ]; then
+    publish_release "$LATEST_TAG" "Latest Debug APK" "Moving Forgejo debug APK pointer for ${TARGET_COMMITISH}."
+    log "published $APK_NAME to Forgejo releases: $VERSION_TAG and $LATEST_TAG"
+  else
+    log "published $APK_NAME to Forgejo release: $VERSION_TAG"
+  fi
 }
 
 main "$@"
