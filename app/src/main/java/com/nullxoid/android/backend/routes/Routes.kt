@@ -11,8 +11,15 @@ import com.nullxoid.android.data.model.HealthFeatures
 import com.nullxoid.android.data.model.LoginRequest
 import com.nullxoid.android.data.model.ModelDescriptor
 import com.nullxoid.android.data.model.ModelListResponse
+import com.nullxoid.android.data.model.ProjectCreateRequest
+import com.nullxoid.android.data.model.ProjectCreateResponse
+import com.nullxoid.android.data.model.ProjectListResponse
+import com.nullxoid.android.data.model.ProjectSummary
 import com.nullxoid.android.data.model.RemoteSettings
 import com.nullxoid.android.data.model.StoreActionRequest
+import com.nullxoid.android.data.model.ChatUpdateRequest
+import com.nullxoid.android.data.model.WorkspaceListResponse
+import com.nullxoid.android.data.model.WorkspaceSummary
 import com.nullxoid.android.backend.engine.LlmEngine
 import com.nullxoid.android.backend.nullbridge.NullBridgeAdapter
 import com.nullxoid.android.backend.store.EmbeddedStore
@@ -41,6 +48,9 @@ import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
+private const val EMBEDDED_WORKSPACE_ID = "embedded-lobby"
+private const val EMBEDDED_PROJECT_ID = "embedded-general"
+
 /**
  * Mirrors the path set consumed by [com.nullxoid.android.data.api.NullXoidApi]
  * and [com.nullxoid.android.data.api.ChatStream]. Keep this in sync with
@@ -55,6 +65,7 @@ fun Route.nullxoidRoutes(store: EmbeddedStore, engine: LlmEngine) {
     modelRoutes(engine)
     settingsRoutes(engine)
     storeRoutes()
+    workspaceRoutes()
     chatRoutes(store)
     chatStreamRoute(store, engine)
 }
@@ -680,6 +691,23 @@ private fun Route.chatRoutes(store: EmbeddedStore) {
         call.respond(created)
     }
 
+    put("/api/chats/{id}") {
+        val id = call.parameters["id"].orEmpty()
+        val body = call.receive<ChatUpdateRequest>()
+        val updated = store.updateChat(
+            chatId = id,
+            workspaceId = body.workspaceId,
+            projectId = body.projectId,
+            title = body.title,
+            messages = body.messages
+        )
+        if (updated == null) {
+            call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "chat not found") })
+        } else {
+            call.respond(updated)
+        }
+    }
+
     post("/api/chats/{id}/archive") {
         val id = call.parameters["id"].orEmpty()
         val archived = call.request.queryParameters["archived"]?.toBooleanStrictOrNull() ?: true
@@ -691,6 +719,46 @@ private fun Route.chatRoutes(store: EmbeddedStore) {
         }
     }
 }
+
+private fun Route.workspaceRoutes() {
+    get("/api/workspaces") {
+        call.respond(
+            WorkspaceListResponse(
+                workspaces = listOf(
+                    WorkspaceSummary(
+                        workspaceId = EMBEDDED_WORKSPACE_ID,
+                        name = "Embedded",
+                        slug = "lobby",
+                        isSystem = true
+                    )
+                ),
+                activeWorkspaceId = EMBEDDED_WORKSPACE_ID
+            )
+        )
+    }
+
+    get("/api/projects") {
+        val workspaceId = call.request.queryParameters["workspace_id"]
+            ?.takeIf { it.isNotBlank() }
+            ?: EMBEDDED_WORKSPACE_ID
+        call.respond(ProjectListResponse(projects = listOf(embeddedProject(workspaceId))))
+    }
+
+    post("/api/projects") {
+        val req = call.receive<ProjectCreateRequest>()
+        call.respond(ProjectCreateResponse(project = embeddedProject(req.workspaceId)))
+    }
+}
+
+private fun embeddedProject(workspaceId: String): ProjectSummary =
+    ProjectSummary(
+        id = EMBEDDED_PROJECT_ID,
+        projectId = EMBEDDED_PROJECT_ID,
+        workspaceId = workspaceId,
+        name = "General",
+        slug = "general",
+        isSystem = true
+    )
 
 /**
  * SSE-style stream. Frames match the client parser:

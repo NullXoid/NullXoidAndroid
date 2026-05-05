@@ -1236,7 +1236,7 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(error = "Select a model first")
             return
         }
-        if (!repo.hasSharedSavedChatKey()) {
+        if (!_state.value.embeddedEnabled && !repo.hasSharedSavedChatKey()) {
             _state.value = _state.value.copy(
                 error = "Import the shared saved-chat E2EE key in Settings before sending synced encrypted chats.",
                 lastFailedPrompt = trimmed

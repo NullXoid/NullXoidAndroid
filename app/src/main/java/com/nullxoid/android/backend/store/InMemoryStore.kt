@@ -64,6 +64,26 @@ class InMemoryStore : EmbeddedStore {
         return record
     }
 
+    override fun updateChat(
+        chatId: String,
+        workspaceId: String?,
+        projectId: String?,
+        title: String,
+        messages: List<ChatMessage>
+    ): ChatRecord? {
+        val existing = chats[chatId] ?: return null
+        val now = java.time.Instant.now().toString()
+        val updated = existing.copy(
+            title = title.ifBlank { existing.title },
+            workspaceId = workspaceId ?: existing.workspaceId,
+            projectId = projectId ?: existing.projectId,
+            updatedAt = now,
+            session = ChatSession(messages = messages)
+        )
+        chats[chatId] = updated
+        return updated
+    }
+
     override fun appendAssistantMessage(chatId: String, assistantText: String): ChatRecord? {
         val existing = chats[chatId] ?: return null
         val now = java.time.Instant.now().toString()

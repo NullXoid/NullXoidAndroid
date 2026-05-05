@@ -381,6 +381,7 @@ fun StoreScreen(
         StoreMediaViewer(
             artifact = artifact,
             bytes = state.storeViewerBytes,
+            previewBytes = state.storePreviewBytes[artifact.artifactId] ?: ByteArray(0),
             loading = state.storeViewerLoading,
             error = state.storeViewerError,
             onClose = onCloseViewer,
@@ -1039,6 +1040,7 @@ private class ByteArrayVideoDataSource(
 fun StoreMediaViewer(
     artifact: StoreArtifactRef,
     bytes: ByteArray,
+    previewBytes: ByteArray,
     loading: Boolean,
     error: String,
     onClose: () -> Unit,
@@ -1083,6 +1085,15 @@ fun StoreMediaViewer(
                             )
                         artifact.mimeType.startsWith("video/") ->
                             Text("Video is ready. Save or Share to open it with a player.", color = Color.White)
+                        (artifact.mimeType.startsWith("model/") || artifact.format in setOf("glb", "gltf")) &&
+                            previewBytes.isNotEmpty() ->
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                ZoomableImage(previewBytes)
+                                Text("Rendered GLB preview. Save the GLB to open the model file.", color = Color.White)
+                            }
                         artifact.mimeType.startsWith("model/") || artifact.format in setOf("glb", "gltf") ->
                             Text("3D preview not yet available. Save the GLB to open it in a model viewer.", color = Color.White)
                         else -> Text("Preview is not available yet.", color = Color.White)

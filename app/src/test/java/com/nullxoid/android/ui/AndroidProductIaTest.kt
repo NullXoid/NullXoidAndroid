@@ -229,12 +229,14 @@ class AndroidProductIaTest {
     }
 
     @Test
-    fun model3dGalleryCardsUsePlaceholderAndDownloadSavePath() {
+    fun model3dGalleryCardsUseRenderedPreviewAndDownloadSavePath() {
         val store = File("src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt").readText()
         val viewModel = File("src/main/java/com/nullxoid/android/ui/NullXoidViewModel.kt").readText()
         val uiModels = File("src/main/java/com/nullxoid/android/ui/store/StoreUiModels.kt").readText()
 
         assertTrue(store.contains("3D preview not yet available. Save the GLB to open it in a model viewer."))
+        assertTrue(store.contains("Rendered GLB preview. Save the GLB to open the model file."))
+        assertTrue(store.contains("previewBytes = state.storePreviewBytes[artifact.artifactId]"))
         assertTrue(store.contains("3D model generation uses an image first."))
         assertTrue(store.contains("Choose image first"))
         assertTrue(viewModel.contains("sourceImageArtifactId"))

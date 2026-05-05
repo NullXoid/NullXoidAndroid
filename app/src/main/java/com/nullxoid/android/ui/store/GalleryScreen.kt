@@ -149,6 +149,7 @@ fun GalleryScreen(
         StoreMediaViewer(
             artifact = artifact,
             bytes = state.storeViewerBytes,
+            previewBytes = state.storePreviewBytes[artifact.artifactId] ?: ByteArray(0),
             loading = state.storeViewerLoading,
             error = state.storeViewerError,
             onClose = onCloseViewer,

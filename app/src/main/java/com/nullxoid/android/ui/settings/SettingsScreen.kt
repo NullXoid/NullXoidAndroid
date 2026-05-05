@@ -424,8 +424,8 @@ fun SettingsScreen(
             Text(
                 when (state.updateSource) {
                     SettingsStore.UPDATE_SOURCE_FORGEJO -> "Use EchoLabs Forgejo releases only."
-                    SettingsStore.UPDATE_SOURCE_GITHUB -> "Use the public GitHub mirror only."
-                    else -> "Try EchoLabs Forgejo first, then GitHub mirror."
+                    SettingsStore.UPDATE_SOURCE_GITHUB -> "Use the public mirror only when explicitly allowed."
+                    else -> "Use EchoLabs Forgejo unless another source is explicitly allowed."
                 },
                 style = MaterialTheme.typography.bodySmall
             )
@@ -506,6 +506,7 @@ fun SettingsScreen(
                             "Running on 127.0.0.1:8090 - $selectedProviderName provider"
                         else
                             "Use a remote NullXoid backend via the Base URL below",
+                        modifier = Modifier.testTag("settings-embedded-status"),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
