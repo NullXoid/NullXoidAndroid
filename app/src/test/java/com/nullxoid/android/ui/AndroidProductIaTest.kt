@@ -227,4 +227,20 @@ class AndroidProductIaTest {
         assertTrue(store.contains("Preview loading"))
         assertFalse(store.contains("setDataSource(videoFile.absolutePath)"))
     }
+
+    @Test
+    fun model3dGalleryCardsUsePlaceholderAndDownloadSavePath() {
+        val store = File("src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt").readText()
+        val viewModel = File("src/main/java/com/nullxoid/android/ui/NullXoidViewModel.kt").readText()
+        val uiModels = File("src/main/java/com/nullxoid/android/ui/store/StoreUiModels.kt").readText()
+
+        assertTrue(store.contains("3D preview not yet available. Save the GLB to open it in a model viewer."))
+        assertTrue(uiModels.contains("3D model"))
+        assertTrue(uiModels.contains("3D ${'$'}{item.format.ifBlank { \"GLB\" }.uppercase()}"))
+        assertTrue(viewModel.contains("mimeType.startsWith(\"model/\")"))
+        assertTrue(viewModel.contains("MediaStore.Downloads.EXTERNAL_CONTENT_URI"))
+        assertTrue(viewModel.contains("Environment.DIRECTORY_DOWNLOADS"))
+        assertTrue(viewModel.contains("model/gltf-binary"))
+        assertFalse(viewModel.contains("model/gltf-binary\" else \"image/png\""))
+    }
 }

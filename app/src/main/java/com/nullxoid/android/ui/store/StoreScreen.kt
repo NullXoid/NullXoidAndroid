@@ -984,6 +984,8 @@ fun StoreMediaViewer(
                             )
                         artifact.mimeType.startsWith("video/") ->
                             Text("Video is ready. Save or Share to open it with a player.", color = Color.White)
+                        artifact.mimeType.startsWith("model/") || artifact.format in setOf("glb", "gltf") ->
+                            Text("3D preview not yet available. Save the GLB to open it in a model viewer.", color = Color.White)
                         else -> Text("Preview is not available yet.", color = Color.White)
                     }
                 }

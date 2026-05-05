@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
@@ -963,18 +964,41 @@ class NullXoidViewModel(
 
     private suspend fun saveMediaBytesToDevice(artifactId: String, mimeType: String, bytes: ByteArray): Uri =
         withContext(Dispatchers.IO) {
+            val isModel = mimeType.startsWith("model/")
             val isVideo = mimeType.startsWith("video/")
             val extension = when {
+                mimeType == "model/gltf+json" -> "gltf"
+                isModel -> "glb"
                 mimeType == "video/webm" -> "webm"
                 mimeType.startsWith("video/") -> "mp4"
                 mimeType == "image/jpeg" -> "jpg"
                 else -> "png"
             }
-            val collection = if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-            val relativePath = if (isVideo) Environment.DIRECTORY_MOVIES + "/EchoLabs" else Environment.DIRECTORY_PICTURES + "/EchoLabs"
+            if (isModel && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                error("Saving GLB files requires Android 10 or newer. Use Share to export the model file.")
+            }
+            val collection = when {
+                isModel -> MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                isVideo -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                else -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
+            val relativePath = when {
+                isModel -> Environment.DIRECTORY_DOWNLOADS + "/EchoLabs"
+                isVideo -> Environment.DIRECTORY_MOVIES + "/EchoLabs"
+                else -> Environment.DIRECTORY_PICTURES + "/EchoLabs"
+            }
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, "echolabs-$artifactId.$extension")
-                put(MediaStore.MediaColumns.MIME_TYPE, mimeType.ifBlank { if (isVideo) "video/mp4" else "image/png" })
+                put(
+                    MediaStore.MediaColumns.MIME_TYPE,
+                    mimeType.ifBlank {
+                        when {
+                            isModel -> "model/gltf-binary"
+                            isVideo -> "video/mp4"
+                            else -> "image/png"
+                        }
+                    }
+                )
                 put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
             }
             val resolver = appContext.contentResolver
