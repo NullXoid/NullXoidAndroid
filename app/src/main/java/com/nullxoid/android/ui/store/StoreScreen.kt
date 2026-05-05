@@ -9,6 +9,7 @@ import android.media.MediaDataSource
 import android.media.MediaMetadataRetriever
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.net.Uri
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -96,7 +97,7 @@ fun StoreScreen(
     onOpenAsk: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectAddon: (String) -> Unit,
-    onRunStoreAddon: (String, String, String, String, String, String, Int, String, String, String, String) -> Unit,
+    onRunStoreAddon: (String, String, String, String, String, String, Int, String, String, String, String, String) -> Unit,
     onSaveArtifact: (String, String) -> Unit,
     onShareArtifact: (String, String) -> Unit,
     onViewArtifact: (StoreArtifactRef) -> Unit,
@@ -153,6 +154,8 @@ fun StoreScreen(
     }
     var audioPrompt by remember(selectedAddon?.id) { mutableStateOf("") }
     var recordedAudioPath by remember(selectedAddon?.id) { mutableStateOf("") }
+    var sourceImagePath by remember(selectedAddon?.id) { mutableStateOf("") }
+    var sourceImageStatus by remember(selectedAddon?.id) { mutableStateOf("") }
     var recorder by remember { mutableStateOf<WavVoiceRecorder?>(null) }
     var recording by remember { mutableStateOf(false) }
     var audioStatus by remember(selectedAddon?.id) { mutableStateOf("") }
@@ -169,6 +172,21 @@ fun StoreScreen(
             )
         } else {
             audioStatus = "Microphone permission denied."
+        }
+    }
+    val sourceImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) {
+            sourceImageStatus = "No source image selected."
+        } else {
+            runCatching {
+                sourceImagePath = copySourceImageFor3d(context, uri)
+                sourceImageStatus = "Source image ready"
+            }.onFailure {
+                sourceImagePath = ""
+                sourceImageStatus = "Source image could not be loaded."
+            }
         }
     }
 
@@ -264,8 +282,15 @@ fun StoreScreen(
                         recordedAudioPath = recordedAudioPath,
                         recording = recording,
                         audioStatus = audioStatus,
+                        sourceImagePath = sourceImagePath,
+                        sourceImageStatus = sourceImageStatus,
                         onAudioModeChange = { audioMode = it },
                         onAudioPromptChange = { audioPrompt = it },
+                        onPickSourceImage = { sourceImageLauncher.launch("image/*") },
+                        onClearSourceImage = {
+                            sourceImagePath = ""
+                            sourceImageStatus = ""
+                        },
                         onStartRecording = {
                             if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                                 android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -306,7 +331,8 @@ fun StoreScreen(
                                     selectedProfile?.format.orEmpty(),
                                     if (mediaKind == "video") audioMode else "none",
                                     recordedAudioPath,
-                                    audioPrompt.ifBlank { "Generate synchronized audio that matches the video prompt." }
+                                    audioPrompt.ifBlank { "Generate synchronized audio that matches the video prompt." },
+                                    if (mediaKind == "3d") sourceImagePath else ""
                                 )
                             }
                         }
@@ -585,11 +611,15 @@ private fun StoreAddonPanel(
     recordedAudioPath: String,
     recording: Boolean,
     audioStatus: String,
+    sourceImagePath: String,
+    sourceImageStatus: String,
     onSelectProfile: (String) -> Unit,
     onPromptChange: (String) -> Unit,
     onSizeChange: (String) -> Unit,
     onAudioModeChange: (String) -> Unit,
     onAudioPromptChange: (String) -> Unit,
+    onPickSourceImage: () -> Unit,
+    onClearSourceImage: () -> Unit,
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
     onRun: () -> Unit
@@ -689,20 +719,89 @@ private fun StoreAddonPanel(
                     onStopRecording = onStopRecording
                 )
             }
+            if (mediaKind == "3d") {
+                Model3DSourceImageOptions(
+                    sourceImagePath = sourceImagePath,
+                    status = sourceImageStatus,
+                    onPickSourceImage = onPickSourceImage,
+                    onClearSourceImage = onClearSourceImage
+                )
+            }
             val missingRecordedAudio = mediaKind == "video" &&
                 audioMode == "recorded_voice" &&
                 recordedAudioPath.isBlank()
+            val missingSourceImage = mediaKind == "3d" && sourceImagePath.isBlank()
             Button(
                 modifier = Modifier
                     .height(52.dp)
                     .testTag("store-${addon?.id ?: "addon"}-generate"),
-                enabled = !loading && addon != null && !recording && !missingRecordedAudio,
+                enabled = !loading && addon != null && !recording && !missingRecordedAudio && !missingSourceImage,
                 onClick = onRun
             ) {
-                Text(if (loading) "Checking job..." else "Generate with approval")
+                Text(
+                    when {
+                        loading -> "Checking job..."
+                        missingSourceImage -> "Choose image first"
+                        else -> "Generate with approval"
+                    }
+                )
             }
         }
     }
+}
+
+
+@Composable
+private fun Model3DSourceImageOptions(
+    sourceImagePath: String,
+    status: String,
+    onPickSourceImage: () -> Unit,
+    onClearSourceImage: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Source image", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "3D model generation uses an image first. Generate or choose an image, then use it to make the GLB.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onPickSourceImage) {
+                Text(if (sourceImagePath.isBlank()) "Choose image" else "Change image")
+            }
+            if (sourceImagePath.isNotBlank()) {
+                OutlinedButton(onClick = onClearSourceImage) {
+                    Text("Clear")
+                }
+            }
+        }
+        val readyText = status.ifBlank {
+            if (sourceImagePath.isNotBlank()) "Source image ready" else "No source image selected"
+        }
+        Text(
+            readyText,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+
+private fun copySourceImageFor3d(context: Context, uri: Uri): String {
+    val mimeType = context.contentResolver.getType(uri).orEmpty().lowercase()
+    val extension = when (mimeType) {
+        "image/jpeg" -> "jpg"
+        "image/webp" -> "webp"
+        else -> "png"
+    }
+    val targetDir = File(context.cacheDir, "store_3d_source_images").apply { mkdirs() }
+    val target = File(targetDir, "source-image.$extension")
+    context.contentResolver.openInputStream(uri).use { input ->
+        requireNotNull(input) { "Source image could not be opened." }
+        target.outputStream().use { output -> input.copyTo(output) }
+    }
+    require(target.length() > 0L) { "Source image is empty." }
+    return target.absolutePath
 }
 
 @Composable

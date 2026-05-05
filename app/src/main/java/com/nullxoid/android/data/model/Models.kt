@@ -355,6 +355,7 @@ data class StoreActionRequest(
     val audioMode: String = "none",
     val audioArtifactId: String = "",
     val audioPrompt: String = "",
+    val sourceImageArtifactId: String = "",
     val waitForApproval: Boolean = false
 )
 

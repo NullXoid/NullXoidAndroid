@@ -668,7 +668,8 @@ class NullXoidViewModel(
             format = "glb",
             audioMode = "none",
             recordedAudioPath = "",
-            audioPrompt = ""
+            audioPrompt = "",
+            sourceImagePath = ""
         )
     }
 
@@ -683,7 +684,8 @@ class NullXoidViewModel(
         format: String,
         audioMode: String,
         recordedAudioPath: String,
-        audioPrompt: String
+        audioPrompt: String,
+        sourceImagePath: String = ""
     ) {
         val cleanPrompt = prompt.trim()
         if (cleanPrompt.isBlank()) {
@@ -695,6 +697,10 @@ class NullXoidViewModel(
         }
         if (cleanAudioMode == "recorded_voice" && recordedAudioPath.isBlank()) {
             _state.value = _state.value.copy(error = "Record a voice clip before generating with recorded voice.")
+            return
+        }
+        if (addonId == "local-3d-studio" && sourceImagePath.isBlank()) {
+            _state.value = _state.value.copy(error = "Choose a source image before generating a 3D model.")
             return
         }
         viewModelScope.launch {
@@ -717,6 +723,24 @@ class NullXoidViewModel(
                 } else {
                     ""
                 }
+                val sourceImageArtifactId = if (addonId == "local-3d-studio") {
+                    val imageFile = File(sourceImagePath)
+                    require(imageFile.exists() && imageFile.length() > 0L) {
+                        "Choose a source image before generating a 3D model."
+                    }
+                    val bytes = withContext(Dispatchers.IO) { imageFile.readBytes() }
+                    val extension = imageFile.extension.lowercase().ifBlank { "png" }
+                    val mimeType = when (extension) {
+                        "jpg", "jpeg" -> "image/jpeg"
+                        "webp" -> "image/webp"
+                        else -> "image/png"
+                    }
+                    val uploaded = repo.uploadStoreImage("source-image.$extension", mimeType, bytes)
+                    require(uploaded.isNotBlank()) { "Source image upload failed." }
+                    uploaded
+                } else {
+                    ""
+                }
                 repo.runStoreAction(
                     addonId = addonId,
                     action = action,
@@ -728,7 +752,8 @@ class NullXoidViewModel(
                     jobType = jobType,
                     audioMode = cleanAudioMode,
                     audioArtifactId = audioArtifactId,
-                    audioPrompt = audioPrompt.trim()
+                    audioPrompt = audioPrompt.trim(),
+                    sourceImageArtifactId = sourceImageArtifactId
                 )
             }.onSuccess { result ->
                 val storeJobId = result.storeJobId ?: result.jobId.orEmpty()

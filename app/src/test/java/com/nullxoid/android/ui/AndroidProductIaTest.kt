@@ -235,6 +235,10 @@ class AndroidProductIaTest {
         val uiModels = File("src/main/java/com/nullxoid/android/ui/store/StoreUiModels.kt").readText()
 
         assertTrue(store.contains("3D preview not yet available. Save the GLB to open it in a model viewer."))
+        assertTrue(store.contains("3D model generation uses an image first."))
+        assertTrue(store.contains("Choose image first"))
+        assertTrue(viewModel.contains("sourceImageArtifactId"))
+        assertTrue(viewModel.contains("Choose a source image before generating a 3D model."))
         assertTrue(uiModels.contains("3D model"))
         assertTrue(uiModels.contains("3D ${'$'}{item.format.ifBlank { \"GLB\" }.uppercase()}"))
         assertTrue(viewModel.contains("mimeType.startsWith(\"model/\")"))
