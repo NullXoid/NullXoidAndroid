@@ -25,6 +25,7 @@ import com.nullxoid.android.data.model.StoreActionRequest
 import com.nullxoid.android.data.model.StoreActionResponse
 import com.nullxoid.android.data.model.StoreCatalogResponse
 import com.nullxoid.android.data.model.StoreGalleryResponse
+import com.nullxoid.android.data.model.StoreJobsResponse
 import com.nullxoid.android.data.model.UploadArtifactResponse
 import com.nullxoid.android.data.model.WorkspaceListResponse
 import java.net.URLEncoder
@@ -177,6 +178,12 @@ class NullXoidApi(
 
     suspend fun storeJob(storeJobId: String): StoreActionResponse =
         getJson("/api/store/jobs/${urlEncode(storeJobId)}")
+
+    suspend fun storeJobs(activeOnly: Boolean = true, limit: Int = 50): StoreJobsResponse =
+        getJson("/api/store/jobs?activeOnly=$activeOnly&limit=${limit.coerceIn(1, 100)}")
+
+    suspend fun cancelStoreJob(storeJobId: String): StoreActionResponse =
+        sendJson("POST", "/api/store/jobs/${urlEncode(storeJobId)}/cancel", JsonObject(emptyMap()))
 
     suspend fun runStoreAction(addonId: String, action: String, request: StoreActionRequest): StoreActionResponse =
         sendJson("POST", "/api/store/addons/${urlEncode(addonId)}/actions/${urlEncode(action)}", request)

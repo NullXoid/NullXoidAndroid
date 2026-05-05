@@ -1,5 +1,7 @@
 package com.nullxoid.android.backend.routes
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import com.nullxoid.android.data.model.AuthState
 import com.nullxoid.android.data.model.ChatCreateRequest
 import com.nullxoid.android.data.model.ChatListResponse
@@ -19,6 +21,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondBytesWriter
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -32,6 +35,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.ByteArrayOutputStream
+import java.security.MessageDigest
+import java.time.Instant
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Mirrors the path set consumed by [com.nullxoid.android.data.api.NullXoidApi]
@@ -236,6 +244,32 @@ private const val local3dStudioId = "local-3d-studio"
 private const val local3dStudioAction = "media.model3d.generate.local"
 private const val local3dStudioCapability = "suite.media.model3d.generate"
 
+private data class LocalStoreArtifact(
+    val artifactId: String,
+    val addonId: String,
+    val mimeType: String,
+    val bytes: ByteArray,
+    val prompt: String,
+    val createdAt: String
+)
+
+private data class LocalStoreJob(
+    val storeJobId: String,
+    val addonId: String,
+    val mediaKind: String,
+    val prompt: String,
+    val imageSize: String,
+    val createdAt: String,
+    val artifactId: String,
+    val pollCount: Int = 0,
+    val status: String = "pending_approval",
+    val cancelRequested: Boolean = false,
+    val cancelledAt: String = ""
+)
+
+private val localStoreJobs = ConcurrentHashMap<String, LocalStoreJob>()
+private val localStoreArtifacts = ConcurrentHashMap<String, LocalStoreArtifact>()
+
 private data class StoreAddonFixture(
     val id: String,
     val name: String,
@@ -366,6 +400,103 @@ private fun storeAddonJson(addon: StoreAddonFixture): JsonObject = buildJsonObje
     )
 }
 
+private fun mediaKindForAddon(addonId: String): String = when (addonId) {
+    localVideoStudioId -> "video"
+    local3dStudioId -> "model3d"
+    else -> "image"
+}
+
+private fun sha256Hex(bytes: ByteArray): String =
+    MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+private fun localStoreArtifactJson(artifact: LocalStoreArtifact): JsonObject = buildJsonObject {
+    put("artifactId", artifact.artifactId)
+    put("thumbnailId", artifact.artifactId)
+    put("thumbnailUrl", "/artifacts/${artifact.artifactId}")
+    put("previewUrl", "/artifacts/${artifact.artifactId}")
+    put("mimeType", artifact.mimeType)
+    put("status", "ready")
+    put("format", "png")
+    put("createdAt", artifact.createdAt)
+    put("updatedAt", artifact.createdAt)
+}
+
+private fun localStoreJobJson(job: LocalStoreJob): JsonObject {
+    val artifact = localStoreArtifacts[job.artifactId]
+    val artifacts = if (job.status == "succeeded" && artifact != null) {
+        JsonArray(listOf(localStoreArtifactJson(artifact)))
+    } else {
+        JsonArray(emptyList())
+    }
+    return buildJsonObject {
+        put("ok", true)
+        put("storeJobId", job.storeJobId)
+        put("jobId", job.storeJobId)
+        put("requestId", job.storeJobId)
+        put("addonId", job.addonId)
+        put("mediaKind", job.mediaKind)
+        put("status", job.status)
+        put("approvalRequired", job.status == "pending_approval")
+        put("approvalSource", if (job.status == "pending_approval") "approval_required" else "active_timed_grant")
+        put("queueLane", job.mediaKind)
+        put("queuePosition", 0)
+        put("canCancel", job.status in setOf("pending_approval", "approved", "queued_connector"))
+        put("cancelRequested", job.cancelRequested)
+        put("pollAfterMs", 1000)
+        put(
+            "events",
+            JsonArray(
+                listOf(
+                    buildJsonObject {
+                        put("type", "created")
+                        put("at", job.createdAt)
+                        put("status", "pending_approval")
+                    }
+                ) + if (job.status == "cancelled") {
+                    listOf(
+                        buildJsonObject {
+                            put("type", "cancelled")
+                            put("at", job.cancelledAt.ifBlank { Instant.now().toString() })
+                            put("status", "cancelled")
+                        }
+                    )
+                } else {
+                    emptyList()
+                }
+            )
+        )
+        put("artifacts", artifacts)
+        put("result", buildJsonObject { put("artifacts", artifacts) })
+        if (artifact != null && job.status == "succeeded") {
+            put("artifactId", artifact.artifactId)
+            put("previewUrl", "/artifacts/${artifact.artifactId}")
+            put("thumbnailUrl", "/artifacts/${artifact.artifactId}")
+            put("mimeType", artifact.mimeType)
+        }
+        put("createdAt", job.createdAt)
+        put("updatedAt", Instant.now().toString())
+        put("cancelledAt", job.cancelledAt)
+    }
+}
+
+private fun generatedImagePng(prompt: String, imageSize: String, artifactId: String): ByteArray {
+    val bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888)
+    val digest = MessageDigest.getInstance("SHA-256")
+        .digest("$artifactId:$prompt:$imageSize".toByteArray(Charsets.UTF_8))
+    for (y in 0 until 256) {
+        for (x in 0 until 256) {
+            val r = (digest[0].toInt() and 0xff).let { (it + x * 3 + y) and 0xff }
+            val g = (digest[1].toInt() and 0xff).let { (it + x + y * 5) and 0xff }
+            val b = (digest[2].toInt() and 0xff).let { (it + x * 2 + y * 2) and 0xff }
+            bitmap.setPixel(x, y, Color.rgb(r, g, b))
+        }
+    }
+    val out = ByteArrayOutputStream()
+    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+    bitmap.recycle()
+    return out.toByteArray()
+}
+
 private fun storeAddonById(addonId: String): StoreAddonFixture? =
     storeAddonFixtures.firstOrNull { it.id == addonId }
 
@@ -415,14 +546,92 @@ private fun Route.storeRoutes() {
                 }
             )
         } else {
+            val now = Instant.now().toString()
+            val storeJobId = "store-${UUID.randomUUID()}"
+            val artifactId = "artifact-${sha256Hex(storeJobId.toByteArray(Charsets.UTF_8)).take(16)}"
+            val bytes = generatedImagePng(body.prompt, body.imageSize, artifactId)
+            localStoreArtifacts[artifactId] = LocalStoreArtifact(
+                artifactId = artifactId,
+                addonId = addonId,
+                mimeType = "image/png",
+                bytes = bytes,
+                prompt = body.prompt,
+                createdAt = now
+            )
+            localStoreJobs[storeJobId] = LocalStoreJob(
+                storeJobId = storeJobId,
+                addonId = addonId,
+                mediaKind = mediaKindForAddon(addonId),
+                prompt = body.prompt,
+                imageSize = body.imageSize,
+                createdAt = now,
+                artifactId = artifactId
+            )
             call.respond(
                 buildJsonObject {
                     put("ok", true)
-                    put("requestId", "android-store-local-demo")
+                    put("storeJobId", storeJobId)
+                    put("jobId", storeJobId)
+                    put("requestId", storeJobId)
+                    put("addonId", addonId)
+                    put("mediaKind", mediaKindForAddon(addonId))
                     put("status", "pending_approval")
                     put("approvalRequired", true)
+                    put("pollAfterMs", 1000)
                 }
             )
+        }
+    }
+
+    get("/api/store/jobs/{storeJobId}") {
+        val storeJobId = call.parameters["storeJobId"].orEmpty()
+        val job = localStoreJobs[storeJobId]
+        if (job == null) {
+            call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "store job not found") })
+        } else {
+            val next = if (job.status == "pending_approval") {
+                job.copy(pollCount = job.pollCount + 1, status = if (job.pollCount >= 1) "succeeded" else "pending_approval")
+            } else {
+                job
+            }
+            localStoreJobs[storeJobId] = next
+            call.respond(localStoreJobJson(next))
+        }
+    }
+
+    get("/api/store/jobs") {
+        val activeOnly = call.request.queryParameters["activeOnly"]?.toBooleanStrictOrNull() ?: true
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 50
+        val terminal = setOf("succeeded", "completed", "failed", "cancelled", "denied", "expired")
+        val jobs = localStoreJobs.values
+            .filter { !activeOnly || it.status !in terminal }
+            .sortedWith(compareBy<LocalStoreJob> { it.status in terminal }.thenBy { it.createdAt })
+            .take(limit)
+            .map(::localStoreJobJson)
+        call.respond(
+            buildJsonObject {
+                put("ok", true)
+                put("activeOnly", activeOnly)
+                put("pollAfterMs", 1000)
+                put("jobs", JsonArray(jobs))
+            }
+        )
+    }
+
+    post("/api/store/jobs/{storeJobId}/cancel") {
+        val storeJobId = call.parameters["storeJobId"].orEmpty()
+        val job = localStoreJobs[storeJobId]
+        if (job == null) {
+            call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "store job not found") })
+        } else {
+            val terminal = setOf("succeeded", "completed", "failed", "cancelled", "denied", "expired")
+            val next = if (job.status in terminal) {
+                job
+            } else {
+                job.copy(status = "cancelled", cancelRequested = true, cancelledAt = Instant.now().toString())
+            }
+            localStoreJobs[storeJobId] = next
+            call.respond(localStoreJobJson(next))
         }
     }
 
@@ -431,13 +640,28 @@ private fun Route.storeRoutes() {
         if (storeAddonById(addonId) == null) {
             call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "addon not found") })
         } else {
+            val items = localStoreArtifacts.values
+                .filter { it.addonId == addonId }
+                .filter { artifact -> localStoreJobs.values.any { it.artifactId == artifact.artifactId && it.status == "succeeded" } }
+                .sortedByDescending { it.createdAt }
+                .map(::localStoreArtifactJson)
             call.respond(
                 buildJsonObject {
                     put("ok", true)
                     put("addonId", addonId)
-                    put("items", JsonArray(emptyList()))
+                    put("items", JsonArray(items))
                 }
             )
+        }
+    }
+
+    get("/artifacts/{artifactId}") {
+        val artifactId = call.parameters["artifactId"].orEmpty()
+        val artifact = localStoreArtifacts[artifactId]
+        if (artifact == null) {
+            call.respond(HttpStatusCode.NotFound, buildJsonObject { put("detail", "artifact not found") })
+        } else {
+            call.respondBytes(artifact.bytes, ContentType.Image.PNG)
         }
     }
 }

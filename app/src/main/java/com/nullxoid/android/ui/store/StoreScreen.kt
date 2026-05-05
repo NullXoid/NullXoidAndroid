@@ -92,6 +92,7 @@ fun StoreScreen(
     initialAddonId: String,
     onRefresh: () -> Unit,
     onOpenGallery: () -> Unit,
+    onOpenJobs: () -> Unit,
     onOpenAsk: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectAddon: (String) -> Unit,
@@ -221,6 +222,15 @@ fun StoreScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (state.storeJobs.isNotEmpty() || state.activeStoreJobId.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        modifier = Modifier.testTag("store-view-jobs"),
+                        onClick = onOpenJobs
+                    ) {
+                        Text("View jobs")
+                    }
+                }
             }
 
             if (addons.isEmpty()) {

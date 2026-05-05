@@ -27,7 +27,9 @@ import com.nullxoid.android.data.model.StoreActionResponse
 import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.data.model.StoreCatalogResponse
 import com.nullxoid.android.data.model.StoreGalleryResponse
+import com.nullxoid.android.data.model.StoreJobSummary
 import com.nullxoid.android.data.model.StreamEvent
+import com.nullxoid.android.data.model.toStoreJobSummary
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.data.repo.NullXoidRepository
 import com.nullxoid.android.data.update.AppUpdateChecker
@@ -72,6 +74,34 @@ private data class StoreGalleriesRefreshResult(
     val activeJob: StoreActionResponse?,
     val activeJobId: String,
     val activeAddonId: String
+)
+
+private fun jobSummaryToActionResponse(job: StoreJobSummary): StoreActionResponse = StoreActionResponse(
+    ok = job.ok,
+    storeJobId = job.storeJobId,
+    jobId = job.jobId,
+    providerJobId = job.providerJobId,
+    requestId = job.requestId,
+    addonId = job.addonId,
+    mediaKind = job.mediaKind,
+    capability = job.capability,
+    action = job.action,
+    status = job.status,
+    approvalRequired = job.approvalRequired,
+    approvalSource = job.approvalSource,
+    queueLane = job.queueLane,
+    queuePosition = job.queuePosition,
+    canCancel = job.canCancel,
+    cancelRequested = job.cancelRequested,
+    pollAfterMs = job.pollAfterMs,
+    errorCode = job.errorCode,
+    artifacts = job.artifacts,
+    createdAt = job.createdAt,
+    updatedAt = job.updatedAt,
+    startedAt = job.startedAt,
+    completedAt = job.completedAt,
+    cancelledAt = job.cancelledAt,
+    events = job.events
 )
 
 internal fun parseSavedChatRecoveryImport(json: Json, raw: String): JsonObject {
@@ -211,6 +241,9 @@ data class AppUiState(
     val storeGallery: StoreGalleryResponse = StoreGalleryResponse(addonId = "local-image-studio"),
     val storeGalleryAll: List<StoreArtifactRef> = emptyList(),
     val storeAction: StoreActionResponse? = null,
+    val storeJobs: List<StoreJobSummary> = emptyList(),
+    val storeJobsActiveOnly: Boolean = true,
+    val storeJobsLoading: Boolean = false,
     val storeLoading: Boolean = false,
     val activeStoreJobId: String = "",
     val activeStoreAddonId: String = "",
@@ -513,6 +546,7 @@ class NullXoidViewModel(
                     activeStoreJobId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeJobId,
                     activeStoreAddonId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeAddonId
                 )
+                refreshStoreJobsOnce(true)
             }.onFailure { t ->
                 _state.value = _state.value.copy(
                     storeLoading = false,
@@ -529,6 +563,44 @@ class NullXoidViewModel(
                 .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
                 .onFailure { t -> _state.value = _state.value.copy(error = t.message ?: "Gallery refresh failed") }
         }
+    }
+
+    fun refreshStoreJobs(activeOnly: Boolean = true) {
+        viewModelScope.launch { refreshStoreJobsOnce(activeOnly) }
+    }
+
+    private suspend fun refreshStoreJobsOnce(activeOnly: Boolean = true): List<StoreJobSummary> {
+        _state.value = _state.value.copy(storeJobsLoading = true, error = null)
+        return runCatching { repo.storeJobs(activeOnly = activeOnly, limit = 50) }
+            .fold(
+                onSuccess = { response ->
+                val jobs = response.jobs
+                val latest = jobs.firstOrNull()
+                    ?: _state.value.activeStoreJobId
+                        .takeIf { it.isNotBlank() }
+                        ?.let { id -> runCatching { repo.storeJob(id).toStoreJobSummary() }.getOrNull() }
+                val active = jobs.firstOrNull { it.status !in STORE_TERMINAL_STATUSES }
+                if (active == null && _state.value.activeStoreJobId.isNotBlank()) {
+                    settingsStore.clearActiveStoreJob()
+                }
+                _state.value = _state.value.copy(
+                    storeJobs = jobs,
+                    storeJobsActiveOnly = activeOnly,
+                    storeJobsLoading = false,
+                    storeAction = latest?.let(::jobSummaryToActionResponse) ?: _state.value.storeAction,
+                    activeStoreJobId = active?.storeJobId ?: active?.jobId ?: "",
+                    activeStoreAddonId = active?.addonId ?: ""
+                )
+                    jobs
+                },
+                onFailure = { t ->
+                _state.value = _state.value.copy(
+                    storeJobsLoading = false,
+                    error = t.message ?: "Job refresh failed"
+                )
+                    emptyList()
+                }
+            )
     }
 
     fun refreshStoreGalleries() {
@@ -563,6 +635,7 @@ class NullXoidViewModel(
                     activeStoreJobId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeJobId,
                     activeStoreAddonId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeAddonId
                 )
+                refreshStoreJobsOnce(false)
             }.onFailure { t ->
                 _state.value = _state.value.copy(
                     storeLoading = false,
@@ -667,11 +740,13 @@ class NullXoidViewModel(
                         activeStoreAddonId = addonId,
                         storeSaveStatus = ""
                     )
+                    refreshStoreJobsOnce(true)
                     startStoreJobPolling(storeJobId, addonId, result.pollAfterMs)
                 } else {
                     _state.value = _state.value.copy(storeLoading = false, storeAction = result)
                     runCatching { repo.storeGallery(addonId) }
                         .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
+                    refreshStoreJobsOnce(true)
                 }
             }.onFailure { t ->
                 _state.value = _state.value.copy(
@@ -693,11 +768,30 @@ class NullXoidViewModel(
 
     fun resumeStoreJobPolling() {
         viewModelScope.launch {
+            val jobs = refreshStoreJobsOnce(true)
+            if (jobs.any { it.status !in STORE_TERMINAL_STATUSES }) {
+                startStoreJobsPolling()
+                return@launch
+            }
             val jobId = _state.value.activeStoreJobId.ifBlank { settingsStore.activeStoreJobId.first() }
             val addonId = _state.value.activeStoreAddonId.ifBlank { settingsStore.activeStoreAddonId.first() }
             if (jobId.isNotBlank() && addonId.isNotBlank()) {
                 _state.value = _state.value.copy(activeStoreJobId = jobId, activeStoreAddonId = addonId)
                 startStoreJobPolling(jobId, addonId)
+            }
+        }
+    }
+
+    private fun startStoreJobsPolling(initialPollAfterMs: Int = 1500) {
+        storePollJob?.cancel()
+        storePollJob = viewModelScope.launch {
+            var pollAfterMs = initialPollAfterMs.coerceAtLeast(500)
+            while (true) {
+                delay(pollAfterMs.toLong())
+                val jobs = refreshStoreJobsOnce(true)
+                val active = jobs.filter { it.status !in STORE_TERMINAL_STATUSES }
+                pollAfterMs = active.firstOrNull()?.pollAfterMs?.coerceAtLeast(500) ?: 1500
+                if (active.isEmpty()) break
             }
         }
     }
@@ -718,6 +812,7 @@ class NullXoidViewModel(
                     activeStoreJobId = storeJobId,
                     activeStoreAddonId = addonId
                 )
+                refreshStoreJobsOnce(true)
                 pollAfterMs = result.pollAfterMs.coerceAtLeast(500)
                 if (result.status in STORE_TERMINAL_STATUSES) {
                     runCatching { repo.storeGallery(addonId) }
@@ -727,6 +822,33 @@ class NullXoidViewModel(
                     break
                 }
             }
+        }
+    }
+
+    fun cancelStoreJob(storeJobId: String) {
+        if (storeJobId.isBlank()) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(storeJobsLoading = true, error = null)
+            runCatching { repo.cancelStoreJob(storeJobId) }
+                .onSuccess { cancelled ->
+                    _state.value = _state.value.copy(
+                        storeAction = cancelled,
+                        storeLoading = false,
+                        storeJobsLoading = false,
+                        activeStoreJobId = if (cancelled.status in STORE_TERMINAL_STATUSES) "" else storeJobId,
+                        activeStoreAddonId = if (cancelled.status in STORE_TERMINAL_STATUSES) "" else cancelled.addonId
+                    )
+                    if (cancelled.status in STORE_TERMINAL_STATUSES) settingsStore.clearActiveStoreJob()
+                    refreshStoreJobsOnce(false)
+                    runCatching { repo.storeGallery(cancelled.addonId.ifBlank { _state.value.storeGallery.addonId }) }
+                        .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        storeJobsLoading = false,
+                        error = t.message ?: "Cancel job failed"
+                    )
+                }
         }
     }
 

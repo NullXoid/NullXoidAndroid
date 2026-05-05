@@ -3,6 +3,7 @@ package com.nullxoid.android.data.api
 import com.nullxoid.android.BuildConfig
 import com.nullxoid.android.data.prefs.SettingsStore
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackendEndpointTest {
@@ -64,5 +65,14 @@ class BackendEndpointTest {
         assertEquals(SettingsStore.UPDATE_SOURCE_FORGEJO, SettingsStore.normalizeUpdateSource("Forgejo"))
         assertEquals(SettingsStore.UPDATE_SOURCE_GITHUB, SettingsStore.normalizeUpdateSource("github"))
         assertEquals(SettingsStore.UPDATE_SOURCE_AUTO, SettingsStore.normalizeUpdateSource("unknown"))
+    }
+
+    @Test
+    fun storeJobMonitorRoutesUseStablePublicApiPaths() {
+        val source = java.io.File("src/main/java/com/nullxoid/android/data/api/NullXoidApi.kt").readText()
+
+        assertTrue(source.contains("\"/api/store/jobs?activeOnly=\$activeOnly&limit="))
+        assertTrue(source.contains("\"/api/store/jobs/\${urlEncode(storeJobId)}\""))
+        assertTrue(source.contains("\"/api/store/jobs/\${urlEncode(storeJobId)}/cancel\""))
     }
 }

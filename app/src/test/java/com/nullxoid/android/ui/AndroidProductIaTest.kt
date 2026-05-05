@@ -53,6 +53,7 @@ class AndroidProductIaTest {
         assertTrue(source.contains("Private media through approval-gated workflows."))
         assertTrue(source.contains("Latest result"))
         assertTrue(source.contains("store-job-status-card"))
+        assertTrue(source.contains("store-view-jobs"))
         assertTrue(source.contains("store-prompt"))
         assertTrue(source.contains("Generate with approval"))
         assertTrue(source.contains("Auto audio"))
@@ -64,6 +65,29 @@ class AndroidProductIaTest {
         assertTrue(nav.contains("onRunStoreAddon = vm::runStoreAddon"))
         assertTrue(nav.contains("LaunchedEffect(state.auth.authenticated)"))
         assertTrue(nav.contains("if (state.auth.authenticated) vm.refreshStore()"))
+        assertTrue(nav.contains("nav.navigate(Routes.Jobs)"))
+    }
+
+    @Test
+    fun jobsScreenSupportsMonitoringAndCancellation() {
+        val source = File("src/main/java/com/nullxoid/android/ui/store/JobsScreen.kt").readText()
+        val viewModel = File("src/main/java/com/nullxoid/android/ui/NullXoidViewModel.kt").readText()
+        val nav = File("src/main/java/com/nullxoid/android/ui/NullXoidNavHost.kt").readText()
+
+        assertTrue(nav.contains("const val Jobs = \"jobs\""))
+        assertTrue(source.contains("Text(\"Jobs\")"))
+        assertTrue(source.contains("store-job-monitor-card"))
+        assertTrue(source.contains("Cancel this job?"))
+        assertTrue(source.contains("No, keep job"))
+        assertTrue(source.contains("Yes, cancel job"))
+        assertTrue(source.contains("Cancel job"))
+        assertTrue(source.contains("Queue #"))
+        assertTrue(viewModel.contains("storeJobs: List<StoreJobSummary>"))
+        assertTrue(viewModel.contains("repo.storeJobs(activeOnly = activeOnly, limit = 50)"))
+        assertTrue(viewModel.contains("repo.cancelStoreJob(storeJobId)"))
+        assertFalse(source.contains("raw prompt"))
+        assertFalse(source.contains("provider URL"))
+        assertFalse(source.contains("workflow path"))
     }
 
     @Test

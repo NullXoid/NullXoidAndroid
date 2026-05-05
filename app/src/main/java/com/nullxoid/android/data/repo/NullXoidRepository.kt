@@ -28,6 +28,7 @@ import com.nullxoid.android.data.model.StoreActionRequest
 import com.nullxoid.android.data.model.StoreActionResponse
 import com.nullxoid.android.data.model.StoreCatalogResponse
 import com.nullxoid.android.data.model.StoreGalleryResponse
+import com.nullxoid.android.data.model.StoreJobsResponse
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.Flow
@@ -232,6 +233,11 @@ class NullXoidRepository(
     suspend fun storeGallery(addonId: String): StoreGalleryResponse = api.storeGallery(addonId)
 
     suspend fun storeJob(storeJobId: String): StoreActionResponse = api.storeJob(storeJobId)
+
+    suspend fun storeJobs(activeOnly: Boolean = true, limit: Int = 50): StoreJobsResponse =
+        api.storeJobs(activeOnly, limit)
+
+    suspend fun cancelStoreJob(storeJobId: String): StoreActionResponse = api.cancelStoreJob(storeJobId)
 
     suspend fun storeArtifactBytes(artifactId: String): ByteArray = api.getBytes("/artifacts/$artifactId")
 

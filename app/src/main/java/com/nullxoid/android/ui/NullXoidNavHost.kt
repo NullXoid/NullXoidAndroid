@@ -28,6 +28,7 @@ import com.nullxoid.android.ui.health.HealthScreen
 import com.nullxoid.android.ui.onboarding.OnboardingScreen
 import com.nullxoid.android.ui.settings.SettingsScreen
 import com.nullxoid.android.ui.store.GalleryScreen
+import com.nullxoid.android.ui.store.JobsScreen
 import com.nullxoid.android.ui.store.StoreScreen
 import com.nullxoid.android.ui.theme.NullXoidTheme
 
@@ -40,6 +41,7 @@ object Routes {
     const val Health = "health"
     const val Store = "store"
     const val Gallery = "gallery"
+    const val Jobs = "jobs"
 }
 
 @Composable
@@ -230,6 +232,10 @@ fun NullXoidApp(
                             vm.refreshStoreGalleries()
                             nav.navigate(Routes.Gallery)
                         },
+                        onOpenJobs = {
+                            vm.refreshStoreJobs(false)
+                            nav.navigate(Routes.Jobs)
+                        },
                         onOpenAsk = { nav.navigate(Routes.ChatList) { launchSingleTop = true } },
                         onOpenSettings = { nav.navigate(Routes.Settings) },
                         onSelectAddon = vm::refreshStoreGallery,
@@ -240,6 +246,23 @@ fun NullXoidApp(
                         onLoadPreview = vm::ensureStorePreview,
                         onCloseViewer = vm::closeStoreArtifactViewer,
                         onResumeStoreJob = vm::resumeStoreJobPolling
+                    )
+                }
+                composable(Routes.Jobs) {
+                    LaunchedEffect(state.auth.authenticated) {
+                        if (state.auth.authenticated) vm.refreshStoreJobs(false)
+                    }
+                    JobsScreen(
+                        state = state,
+                        onRefresh = vm::refreshStoreJobs,
+                        onCancelJob = vm::cancelStoreJob,
+                        onOpenCreate = { openCreate() },
+                        onOpenGallery = {
+                            vm.refreshStoreGalleries()
+                            nav.navigate(Routes.Gallery)
+                        },
+                        onOpenAsk = { nav.navigate(Routes.ChatList) { launchSingleTop = true } },
+                        onOpenSettings = { nav.navigate(Routes.Settings) }
                     )
                 }
                 composable(Routes.Gallery) {
