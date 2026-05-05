@@ -795,8 +795,9 @@ private fun copySourceImageFor3d(context: Context, uri: Uri): String {
         "image/webp" -> "webp"
         else -> "png"
     }
-    val targetDir = File(context.cacheDir, "store_3d_source_images").apply { mkdirs() }
-    val target = File(targetDir, "source-image.$extension")
+    val targetDir = File(context.filesDir, "store_3d_source_images").apply { mkdirs() }
+    targetDir.listFiles()?.forEach { old -> runCatching { old.delete() } }
+    val target = File(targetDir, "source-image-${System.currentTimeMillis()}.$extension")
     context.contentResolver.openInputStream(uri).use { input ->
         requireNotNull(input) { "Source image could not be opened." }
         target.outputStream().use { output -> input.copyTo(output) }

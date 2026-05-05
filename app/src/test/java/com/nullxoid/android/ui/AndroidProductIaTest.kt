@@ -239,6 +239,8 @@ class AndroidProductIaTest {
         assertTrue(store.contains("previewBytes = state.storePreviewBytes[artifact.artifactId]"))
         assertTrue(store.contains("3D model generation uses an image first."))
         assertTrue(store.contains("Choose image first"))
+        assertTrue(store.contains("File(context.filesDir, \"store_3d_source_images\")"))
+        assertTrue(store.contains("source-image-${'$'}{System.currentTimeMillis()}"))
         assertTrue(viewModel.contains("sourceImageArtifactId"))
         assertTrue(viewModel.contains("Choose a source image before generating a 3D model."))
         assertTrue(uiModels.contains("3D model"))
