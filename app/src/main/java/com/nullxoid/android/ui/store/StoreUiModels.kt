@@ -184,7 +184,7 @@ fun friendlyStoreStatus(status: String?, errorCode: String? = null): FriendlySto
 fun safeArtifactTitle(item: StoreArtifactRef, index: Int): String {
     val kind = when {
         item.mimeType.startsWith("video/") -> "Video"
-        item.mimeType.startsWith("model/") || item.format in setOf("glb", "gltf") -> "3D model"
+        isModelArtifact(item) -> "3D model"
         else -> "Image"
     }
     return "$kind ${index + 1}"
@@ -193,11 +193,14 @@ fun safeArtifactTitle(item: StoreArtifactRef, index: Int): String {
 fun artifactTypeLabel(item: StoreArtifactRef): String =
     when {
         item.mimeType.startsWith("video/") -> "Video"
-        item.mimeType.startsWith("model/") || item.format in setOf("glb", "gltf") ->
+        isModelArtifact(item) ->
             "3D ${item.format.ifBlank { "GLB" }.uppercase()}"
         item.mimeType.startsWith("image/") -> "Image"
         else -> item.mimeType.ifBlank { "Media" }
     }
+
+fun isModelArtifact(item: StoreArtifactRef): Boolean =
+    item.mimeType.startsWith("model/") || item.format.lowercase() in setOf("glb", "gltf")
 
 fun safePreviewPath(item: StoreArtifactRef): String =
     listOf(item.thumbnailUrl, item.posterUrl, item.previewUrl, item.modelPreviewUrl)

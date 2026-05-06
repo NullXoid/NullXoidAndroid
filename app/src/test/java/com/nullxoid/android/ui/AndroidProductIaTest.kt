@@ -231,11 +231,23 @@ class AndroidProductIaTest {
     @Test
     fun model3dGalleryCardsUseRenderedPreviewAndDownloadSavePath() {
         val store = File("src/main/java/com/nullxoid/android/ui/store/StoreScreen.kt").readText()
+        val modelViewer = File("src/main/java/com/nullxoid/android/ui/store/Model3DViewer.kt").readText()
         val viewModel = File("src/main/java/com/nullxoid/android/ui/NullXoidViewModel.kt").readText()
         val uiModels = File("src/main/java/com/nullxoid/android/ui/store/StoreUiModels.kt").readText()
+        val gradle = File("build.gradle.kts").readText()
 
         assertTrue(store.contains("3D preview not yet available. Save the GLB to open it in a model viewer."))
         assertTrue(store.contains("Rendered GLB preview. Save the GLB to open the model file."))
+        assertTrue(store.contains("InteractiveGlbViewer"))
+        assertTrue(modelViewer.contains("ModelViewer"))
+        assertTrue(modelViewer.contains("loadModelGlb"))
+        assertTrue(modelViewer.contains("transformToUnitCube"))
+        assertTrue(modelViewer.contains("onTouchEvent"))
+        assertTrue(modelViewer.contains("LightManager.Type.DIRECTIONAL"))
+        assertTrue(modelViewer.contains("store-model3d-viewer"))
+        assertTrue(gradle.contains("com.google.android.filament:filament-android"))
+        assertTrue(gradle.contains("com.google.android.filament:gltfio-android"))
+        assertTrue(gradle.contains("com.google.android.filament:filament-utils-android"))
         assertTrue(store.contains("previewBytes = state.storePreviewBytes[artifact.artifactId]"))
         assertTrue(store.contains("3D model generation uses an image first."))
         assertTrue(store.contains("Choose image first"))

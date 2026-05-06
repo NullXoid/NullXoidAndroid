@@ -1086,6 +1086,12 @@ fun StoreMediaViewer(
                             )
                         artifact.mimeType.startsWith("video/") ->
                             Text("Video is ready. Save or Share to open it with a player.", color = Color.White)
+                        isModelArtifact(artifact) && bytes.isNotEmpty() ->
+                            InteractiveGlbViewer(
+                                artifactId = artifact.artifactId,
+                                bytes = bytes,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         (artifact.mimeType.startsWith("model/") || artifact.format in setOf("glb", "gltf")) &&
                             previewBytes.isNotEmpty() ->
                             Column(

@@ -157,6 +157,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    val filament = "1.71.0"
+    implementation("com.google.android.filament:filament-android:$filament")
+    implementation("com.google.android.filament:gltfio-android:$filament")
+    implementation("com.google.android.filament:filament-utils-android:$filament")
 
     // Embedded on-device backend (Ktor CIO server)
     val ktor = "2.3.12"
