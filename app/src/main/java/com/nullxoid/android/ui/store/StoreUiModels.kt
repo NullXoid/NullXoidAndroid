@@ -64,7 +64,7 @@ fun mediaOptions(addons: List<StoreAddon>, selectedAddonId: String): List<StoreM
             mediaKind = "3d",
             label = "3D",
             addonId = MODEL3D_ADDON_ID,
-            description = "Prepare a GLB/glTF model card.",
+            description = "Generate an experimental beta GLB/glTF model.",
             selected = selectedAddonId == MODEL3D_ADDON_ID
         )
     ).filter { available.containsKey(it.addonId) }
@@ -101,8 +101,8 @@ fun profileOptions(addon: StoreAddon?): List<StoreProfileOption> {
         MODEL3D_ADDON_ID -> listOf(
             StoreProfileOption(
                 id = "model3d-glb-draft",
-                label = "GLB draft/model card",
-                description = "Draft 3D artifact metadata using GLB/glTF terminology.",
+                label = "Beta GLB draft",
+                description = "Experimental source-image to GLB generation with safe beta reporting.",
                 imageSize = "1024x1024",
                 videoSize = "1024x1024",
                 durationMs = 0,
@@ -201,6 +201,46 @@ fun artifactTypeLabel(item: StoreArtifactRef): String =
 
 fun isModelArtifact(item: StoreArtifactRef): Boolean =
     item.mimeType.startsWith("model/") || item.format.lowercase() in setOf("glb", "gltf")
+
+fun isExperimentalModel3d(item: StoreArtifactRef): Boolean =
+    isModelArtifact(item) && item.providerStatus == "experimental_beta"
+
+fun betaQualityLabel(item: StoreArtifactRef): String =
+    when (item.qualityLabel) {
+        "acceptable" -> "Acceptable"
+        "partially_acceptable" -> "Partially acceptable"
+        "flawed" -> "Flawed"
+        "failed" -> "Failed"
+        "unknown" -> "Unknown"
+        else -> ""
+    }
+
+fun betaClassificationLabel(item: StoreArtifactRef): String =
+    when (item.classification) {
+        "generated_mesh_texture_only" -> "Generated mesh + texture-only material"
+        "existing_mesh_uv_wrapped_texture_only" -> "Existing mesh + UV-wrapped texture-only material"
+        "real_displacement_geometry" -> "Real displacement geometry"
+        "unknown" -> "Unknown"
+        else -> ""
+    }
+
+fun betaAssetTypeLabel(item: StoreArtifactRef): String =
+    item.assetType
+        .takeIf { it.isNotBlank() }
+        ?.replace('_', ' ')
+        ?.replaceFirstChar { it.uppercase() }
+        .orEmpty()
+
+fun betaMapAvailabilityLabel(item: StoreArtifactRef): String {
+    val maps = buildList {
+        if (item.mapAvailability.albedo) add("albedo")
+        if (item.mapAvailability.metallicRoughness) add("metallic/roughness")
+        if (item.mapAvailability.normal) add("normal")
+        if (item.mapAvailability.bump) add("bump")
+        if (item.mapAvailability.height) add("height")
+    }
+    return if (maps.isEmpty()) "No generated maps reported" else maps.joinToString(", ")
+}
 
 fun safePreviewPath(item: StoreArtifactRef): String =
     listOf(item.thumbnailUrl, item.posterUrl, item.previewUrl, item.modelPreviewUrl)

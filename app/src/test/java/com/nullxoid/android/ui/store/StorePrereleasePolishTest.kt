@@ -3,6 +3,7 @@ package com.nullxoid.android.ui.store
 import com.nullxoid.android.data.model.StoreAddon
 import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.data.model.StoreGalleryResponse
+import com.nullxoid.android.data.model.StoreMapAvailability
 import com.nullxoid.android.data.model.StoreJobType
 import com.nullxoid.android.data.api.NullXoidApiJson
 import org.junit.Assert.assertEquals
@@ -114,6 +115,74 @@ class StorePrereleasePolishTest {
         assertEquals("/artifacts/artifact-safe-id/thumb", item.thumbnailUrl)
         assertFalse(item.toString().contains("workflow"))
         assertFalse(item.toString().contains("token"))
+    }
+
+    @Test
+    fun galleryResponseParsesExperimental3dBetaMetadataSafely() {
+        val payload = """
+            {
+              "ok": true,
+              "addonId": "local-3d-studio",
+              "items": [
+                {
+                  "artifactId": "artifact-model3d",
+                  "thumbnailUrl": "/artifacts/artifact-model3d/thumb",
+                  "modelPreviewUrl": "/artifacts/artifact-model3d/thumb",
+                  "mimeType": "model/gltf-binary",
+                  "format": "glb",
+                  "status": "ready",
+                  "providerStatus": "experimental_beta",
+                  "providerVersion": "general_3d_provider_v0.1",
+                  "qualityLabel": "partially_acceptable",
+                  "classification": "generated_mesh_texture_only",
+                  "assetType": "vehicle",
+                  "sourceImagePolicy": "transparent_cutout_canonical",
+                  "sourceWarnings": ["dominant subject isolated"],
+                  "knownFlaws": ["normal map unavailable"],
+                  "mapAvailability": {
+                    "albedo": true,
+                    "metallicRoughness": true,
+                    "normal": false,
+                    "bump": false,
+                    "height": false,
+                    "fakeMapsCreated": false
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val gallery = NullXoidApiJson.decodeFromString<StoreGalleryResponse>(payload)
+        val item = gallery.items.single()
+
+        assertTrue(isExperimentalModel3d(item))
+        assertEquals("Partially acceptable", betaQualityLabel(item))
+        assertEquals("Generated mesh + texture-only material", betaClassificationLabel(item))
+        assertEquals("Vehicle", betaAssetTypeLabel(item))
+        assertTrue(betaMapAvailabilityLabel(item).contains("albedo"))
+        assertTrue(betaMapAvailabilityLabel(item).contains("metallic/roughness"))
+        assertEquals(listOf("dominant subject isolated"), item.sourceWarnings)
+        assertEquals(listOf("normal map unavailable"), item.knownFlaws)
+        assertFalse(item.toString().contains("workflow"))
+        assertFalse(item.toString().contains("token"))
+        assertFalse(item.toString().contains("127.0.0.1"))
+    }
+
+    @Test
+    fun experimental3dBetaHelpersTolerateMissingMetadata() {
+        val item = StoreArtifactRef(
+            artifactId = "artifact-model3d",
+            mimeType = "model/gltf-binary",
+            format = "glb",
+            status = "ready",
+            mapAvailability = StoreMapAvailability()
+        )
+
+        assertFalse(isExperimentalModel3d(item))
+        assertEquals("", betaQualityLabel(item))
+        assertEquals("", betaClassificationLabel(item))
+        assertEquals("", betaAssetTypeLabel(item))
+        assertEquals("No generated maps reported", betaMapAvailabilityLabel(item))
     }
 
     @Test

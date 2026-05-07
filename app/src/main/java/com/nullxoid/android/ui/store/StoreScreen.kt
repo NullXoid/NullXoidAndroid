@@ -952,6 +952,9 @@ fun StoreGalleryCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = {}, label = { Text(artifactTypeLabel(item)) })
                 AssistChip(onClick = {}, label = { Text(item.status.ifBlank { "ready" }) })
+                if (isExperimentalModel3d(item)) {
+                    AssistChip(onClick = {}, label = { Text("Beta") })
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(enabled = actionsEnabled, onClick = onView) { Text("View") }
@@ -969,6 +972,28 @@ fun StoreGalleryCard(
                 }
                 if (item.format.isNotBlank()) {
                     Text("Format: ${item.format}", style = MaterialTheme.typography.labelSmall)
+                }
+                if (isExperimentalModel3d(item)) {
+                    val quality = betaQualityLabel(item)
+                    val classification = betaClassificationLabel(item)
+                    val assetType = betaAssetTypeLabel(item)
+                    Text("3D provider: Experimental beta", style = MaterialTheme.typography.labelSmall)
+                    if (quality.isNotBlank()) {
+                        Text("Quality: $quality", style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (classification.isNotBlank()) {
+                        Text("Type: $classification", style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (assetType.isNotBlank()) {
+                        Text("Asset: $assetType", style = MaterialTheme.typography.labelSmall)
+                    }
+                    Text("Maps: ${betaMapAvailabilityLabel(item)}", style = MaterialTheme.typography.labelSmall)
+                    item.sourceWarnings.take(3).forEach { warning ->
+                        Text("Source warning: $warning", style = MaterialTheme.typography.labelSmall)
+                    }
+                    item.knownFlaws.take(3).forEach { flaw ->
+                        Text("Known limit: $flaw", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
         }

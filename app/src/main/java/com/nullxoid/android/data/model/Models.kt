@@ -373,6 +373,16 @@ data class UploadArtifactResponse(
 )
 
 @Serializable
+data class StoreMapAvailability(
+    val albedo: Boolean = false,
+    val metallicRoughness: Boolean = false,
+    val normal: Boolean = false,
+    val bump: Boolean = false,
+    val height: Boolean = false,
+    val fakeMapsCreated: Boolean = false
+)
+
+@Serializable
 data class StoreArtifactRef(
     val artifactId: String = "",
     val thumbnailId: String = "",
@@ -385,7 +395,16 @@ data class StoreArtifactRef(
     val durationMs: Int = 0,
     val format: String = "",
     val createdAt: String = "",
-    val updatedAt: String = ""
+    val updatedAt: String = "",
+    val providerStatus: String = "",
+    val providerVersion: String = "",
+    val qualityLabel: String = "",
+    val classification: String = "",
+    val assetType: String = "",
+    val sourceImagePolicy: String = "",
+    val sourceWarnings: List<String> = emptyList(),
+    val knownFlaws: List<String> = emptyList(),
+    val mapAvailability: StoreMapAvailability = StoreMapAvailability()
 )
 
 @Serializable
