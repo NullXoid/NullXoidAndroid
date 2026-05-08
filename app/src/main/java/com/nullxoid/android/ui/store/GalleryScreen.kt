@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -30,15 +31,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.ui.AppUiState
-import com.nullxoid.android.ui.MainBottomNavigation
-import com.nullxoid.android.ui.MainTab
-import com.nullxoid.android.ui.mainTabSwipeNavigation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GalleryScreen(
     state: AppUiState,
     onRefresh: () -> Unit,
+    onOpenHome: () -> Unit,
     onOpenCreate: () -> Unit,
     onOpenAsk: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -55,21 +54,15 @@ fun GalleryScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Gallery") },
+                navigationIcon = {
+                    IconButton(onClick = onOpenHome) { Icon(Icons.Default.Home, "Home") }
+                },
                 actions = {
                     IconButton(
                         modifier = Modifier.testTag("gallery-refresh"),
                         onClick = onRefresh
                     ) { Icon(Icons.Default.Refresh, "Refresh gallery") }
                 }
-            )
-        },
-        bottomBar = {
-            MainBottomNavigation(
-                selected = MainTab.Gallery,
-                onOpenCreate = onOpenCreate,
-                onOpenGallery = {},
-                onOpenAsk = onOpenAsk,
-                onOpenSettings = onOpenSettings
             )
         }
     ) { inner ->
@@ -79,13 +72,6 @@ fun GalleryScreen(
                 .navigationBarsPadding()
                 .imePadding()
                 .fillMaxSize()
-                .mainTabSwipeNavigation(
-                    selected = MainTab.Gallery,
-                    onOpenCreate = onOpenCreate,
-                    onOpenGallery = {},
-                    onOpenAsk = onOpenAsk,
-                    onOpenSettings = onOpenSettings
-                )
                 .testTag("gallery-screen"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

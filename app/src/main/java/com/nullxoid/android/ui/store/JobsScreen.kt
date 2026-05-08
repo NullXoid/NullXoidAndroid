@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -38,9 +39,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.model.StoreJobSummary
 import com.nullxoid.android.ui.AppUiState
-import com.nullxoid.android.ui.MainBottomNavigation
-import com.nullxoid.android.ui.MainTab
-import com.nullxoid.android.ui.mainTabSwipeNavigation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +46,7 @@ fun JobsScreen(
     state: AppUiState,
     onRefresh: (Boolean) -> Unit,
     onCancelJob: (String) -> Unit,
+    onOpenHome: () -> Unit,
     onOpenCreate: () -> Unit,
     onOpenGallery: () -> Unit,
     onOpenAsk: () -> Unit,
@@ -59,21 +58,15 @@ fun JobsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Jobs") },
+                navigationIcon = {
+                    IconButton(onClick = onOpenHome) { Icon(Icons.Default.Home, "Home") }
+                },
                 actions = {
                     IconButton(
                         modifier = Modifier.testTag("jobs-refresh"),
                         onClick = { onRefresh(showHistory.not()) }
                     ) { Icon(Icons.Default.Refresh, "Refresh jobs") }
                 }
-            )
-        },
-        bottomBar = {
-            MainBottomNavigation(
-                selected = MainTab.Create,
-                onOpenCreate = onOpenCreate,
-                onOpenGallery = onOpenGallery,
-                onOpenAsk = onOpenAsk,
-                onOpenSettings = onOpenSettings
             )
         }
     ) { inner ->
@@ -83,13 +76,6 @@ fun JobsScreen(
                 .navigationBarsPadding()
                 .imePadding()
                 .fillMaxSize()
-                .mainTabSwipeNavigation(
-                    selected = MainTab.Create,
-                    onOpenCreate = onOpenCreate,
-                    onOpenGallery = onOpenGallery,
-                    onOpenAsk = onOpenAsk,
-                    onOpenSettings = onOpenSettings
-                )
                 .testTag("jobs-screen"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

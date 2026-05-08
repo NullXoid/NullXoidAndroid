@@ -28,6 +28,56 @@ data class StoreProfileOption(
     val format: String
 )
 
+data class Model3DSourceImageSlot(
+    val role: String,
+    val label: String,
+    val helper: String,
+    val required: Boolean = false
+)
+
+val model3dSourceImageSlots = listOf(
+    Model3DSourceImageSlot(
+        role = "front",
+        label = "Front / main",
+        helper = "Start here with one clear cutout image.",
+        required = true
+    ),
+    Model3DSourceImageSlot(
+        role = "left",
+        label = "Side",
+        helper = "Helps wide objects, vehicles, tools, and shoes."
+    ),
+    Model3DSourceImageSlot(
+        role = "right",
+        label = "Other side",
+        helper = "Optional. A matching opposite side is best."
+    ),
+    Model3DSourceImageSlot(
+        role = "back",
+        label = "Back",
+        helper = "Optional. Improves backs, tails, handles, and details."
+    ),
+    Model3DSourceImageSlot(
+        role = "top",
+        label = "Top / detail",
+        helper = "Optional. Useful for products, furniture, and props."
+    ),
+    Model3DSourceImageSlot(
+        role = "reference",
+        label = "Texture reference",
+        helper = "Optional color/material reference."
+    )
+)
+
+fun model3dSelectedSourceCount(paths: Map<String, String>): Int =
+    model3dSourceImageSlots.count { slot -> !paths[slot.role].isNullOrBlank() }
+
+fun model3dPrimarySourceReady(paths: Map<String, String>): Boolean =
+    !paths["front"].isNullOrBlank()
+
+fun model3dHasOneSideSource(paths: Map<String, String>): Boolean =
+    !paths["left"].isNullOrBlank() xor !paths["right"].isNullOrBlank()
+
 data class FriendlyStoreStatus(
     val label: String,
     val helper: String,
@@ -230,6 +280,31 @@ fun betaAssetTypeLabel(item: StoreArtifactRef): String =
         ?.replace('_', ' ')
         ?.replaceFirstChar { it.uppercase() }
         .orEmpty()
+
+fun betaRuntimeFamilyLabel(item: StoreArtifactRef): String =
+    when (item.runtimeFamily) {
+        "portable_" + "com" + "fyui_hunyuan3d" -> "Portable 3D runtime"
+        else -> ""
+    }
+
+fun betaGeometryConfidenceLabel(item: StoreArtifactRef): String =
+    when (item.geometryConfidence) {
+        "low" -> "Low"
+        "medium" -> "Medium"
+        "high" -> "High"
+        "unknown" -> "Unknown"
+        else -> ""
+    }
+
+fun betaRecommendedFallbackLabel(item: StoreArtifactRef): String =
+    when (item.recommendedFallback) {
+        "texture_existing_glb" -> "Texture existing GLB"
+        "provide_side_view_source" -> "Provide side-view source"
+        "provide_multiview_sources" -> "Provide multiview sources"
+        "texture_existing_glb_or_multiview_vehicle_generation" -> "Existing GLB or multiview generation"
+        "unknown" -> "Unknown"
+        else -> ""
+    }
 
 fun betaMapAvailabilityLabel(item: StoreArtifactRef): String {
     val maps = buildList {

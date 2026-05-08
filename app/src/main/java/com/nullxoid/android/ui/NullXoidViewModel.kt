@@ -29,6 +29,7 @@ import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.data.model.StoreCatalogResponse
 import com.nullxoid.android.data.model.StoreGalleryResponse
 import com.nullxoid.android.data.model.StoreJobSummary
+import com.nullxoid.android.data.model.StoreSourceImageView
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.model.toStoreJobSummary
 import com.nullxoid.android.data.prefs.SettingsStore
@@ -60,6 +61,7 @@ import java.time.Instant
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
 private const val OIDC_REDIRECT_URI = "nullxoid://auth/oidc/callback"
 private val STORE_TERMINAL_STATUSES = setOf("completed", "denied", "expired", "failed", "cancelled")
+private val MODEL3D_SOURCE_IMAGE_ROLES = listOf("front", "left", "right", "back", "top", "reference")
 
 private data class StoreRefreshResult(
     val catalog: StoreCatalogResponse,
@@ -571,7 +573,7 @@ class NullXoidViewModel(
     }
 
     private suspend fun refreshStoreJobsOnce(activeOnly: Boolean = true): List<StoreJobSummary> {
-        _state.value = _state.value.copy(storeJobsLoading = true, error = null)
+        _state.value = _state.value.copy(storeJobsLoading = true)
         return runCatching { repo.storeJobs(activeOnly = activeOnly, limit = 50) }
             .fold(
                 onSuccess = { response ->
@@ -685,7 +687,9 @@ class NullXoidViewModel(
         audioMode: String,
         recordedAudioPath: String,
         audioPrompt: String,
-        sourceImagePath: String = ""
+        sourceImagePath: String = "",
+        sourceImagePaths: Map<String, String> = emptyMap(),
+        mirrorSideView: Boolean = false
     ) {
         val cleanPrompt = prompt.trim()
         if (cleanPrompt.isBlank()) {
@@ -699,7 +703,8 @@ class NullXoidViewModel(
             _state.value = _state.value.copy(error = "Record a voice clip before generating with recorded voice.")
             return
         }
-        if (addonId == "local-3d-studio" && sourceImagePath.isBlank()) {
+        val primary3dSourcePath = sourceImagePath.ifBlank { sourceImagePaths["front"].orEmpty() }
+        if (addonId == "local-3d-studio" && primary3dSourcePath.isBlank()) {
             _state.value = _state.value.copy(error = "Choose a source image before generating a 3D model.")
             return
         }
@@ -723,24 +728,20 @@ class NullXoidViewModel(
                 } else {
                     ""
                 }
-                val sourceImageArtifactId = if (addonId == "local-3d-studio") {
-                    val imageFile = File(sourceImagePath)
-                    require(imageFile.exists() && imageFile.length() > 0L) {
-                        "Choose a source image before generating a 3D model."
+                val sourceImageViews = if (addonId == "local-3d-studio") {
+                    val selected = linkedMapOf<String, String>()
+                    selected["front"] = primary3dSourcePath
+                    MODEL3D_SOURCE_IMAGE_ROLES.forEach { role ->
+                        val path = sourceImagePaths[role].orEmpty()
+                        if (path.isNotBlank()) selected[role] = path
                     }
-                    val bytes = withContext(Dispatchers.IO) { imageFile.readBytes() }
-                    val extension = imageFile.extension.lowercase().ifBlank { "png" }
-                    val mimeType = when (extension) {
-                        "jpg", "jpeg" -> "image/jpeg"
-                        "webp" -> "image/webp"
-                        else -> "image/png"
-                    }
-                    val uploaded = repo.uploadStoreImage("source-image.$extension", mimeType, bytes)
-                    require(uploaded.isNotBlank()) { "Source image upload failed." }
-                    uploaded
+                    selected
+                        .filterValues { it.isNotBlank() }
+                        .map { (role, path) -> uploadStore3dSourceImage(role, path) }
                 } else {
-                    ""
+                    emptyList()
                 }
+                val sourceImageArtifactId = sourceImageViews.firstOrNull { it.role == "front" }?.artifactId.orEmpty()
                 repo.runStoreAction(
                     addonId = addonId,
                     action = action,
@@ -753,7 +754,10 @@ class NullXoidViewModel(
                     audioMode = cleanAudioMode,
                     audioArtifactId = audioArtifactId,
                     audioPrompt = audioPrompt.trim(),
-                    sourceImageArtifactId = sourceImageArtifactId
+                    sourceImageArtifactId = sourceImageArtifactId,
+                    sourceImageViews = sourceImageViews,
+                    model3dInputMode = if (sourceImageViews.size > 1) "guided_multiview" else "single_image",
+                    mirrorSideView = mirrorSideView
                 )
             }.onSuccess { result ->
                 val storeJobId = result.storeJobId ?: result.jobId.orEmpty()
@@ -782,6 +786,25 @@ class NullXoidViewModel(
                 )
             }
         }
+    }
+
+    private suspend fun uploadStore3dSourceImage(role: String, path: String): StoreSourceImageView {
+        val cleanRole = role.trim().lowercase().replace("-", "_")
+        require(cleanRole in MODEL3D_SOURCE_IMAGE_ROLES) { "Unsupported 3D source image role." }
+        val imageFile = File(path)
+        require(imageFile.exists() && imageFile.length() > 0L) {
+            "Choose a source image before generating a 3D model."
+        }
+        val bytes = withContext(Dispatchers.IO) { imageFile.readBytes() }
+        val extension = imageFile.extension.lowercase().ifBlank { "png" }
+        val mimeType = when (extension) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "webp" -> "image/webp"
+            else -> "image/png"
+        }
+        val uploaded = repo.uploadStoreImage("source-image-$cleanRole.$extension", mimeType, bytes)
+        require(uploaded.isNotBlank()) { "Source image upload failed." }
+        return StoreSourceImageView(role = cleanRole, artifactId = uploaded)
     }
 
     private fun resumeActiveStoreJob() {
@@ -1234,13 +1257,6 @@ class NullXoidViewModel(
         if (_state.value.streaming) return
         val model = _state.value.selectedModel ?: run {
             _state.value = _state.value.copy(error = "Select a model first")
-            return
-        }
-        if (!_state.value.embeddedEnabled && !repo.hasSharedSavedChatKey()) {
-            _state.value = _state.value.copy(
-                error = "Import the shared saved-chat E2EE key in Settings before sending synced encrypted chats.",
-                lastFailedPrompt = trimmed
-            )
             return
         }
         val userMsg = ChatMessage(role = "user", content = trimmed, createdAt = nowIsoTimestamp())

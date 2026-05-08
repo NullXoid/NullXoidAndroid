@@ -146,7 +146,7 @@ fun ChatScreen(
                 Column(Modifier.padding(12.dp)) {
                     state.error?.let {
                         Text(
-                            it,
+                            friendlyChatError(it),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )

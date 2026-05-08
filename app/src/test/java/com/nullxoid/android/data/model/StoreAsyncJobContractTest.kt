@@ -1,5 +1,6 @@
 package com.nullxoid.android.data.model
 
+import com.nullxoid.android.data.api.NullXoidApiJson
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -137,5 +138,34 @@ class StoreAsyncJobContractTest {
         assertFalse(request.audioArtifactId.contains("://"))
         assertFalse(request.audioArtifactId.contains("\\"))
         assertFalse(request.audioArtifactId.contains("/"))
+    }
+
+    @Test
+    fun model3dRequestCanSendGuidedSourceImageArtifactsWithoutPaths() {
+        val request = StoreActionRequest(
+            prompt = "make a usable product model",
+            capability = "suite.media.model3d.generate",
+            jobType = "model-standard",
+            sourceImageArtifactId = "artifact-front",
+            sourceImageViews = listOf(
+                StoreSourceImageView(role = "front", artifactId = "artifact-front"),
+                StoreSourceImageView(role = "left", artifactId = "artifact-left"),
+                StoreSourceImageView(role = "back", artifactId = "artifact-back")
+            ),
+            model3dInputMode = "guided_multiview",
+            mirrorSideView = true
+        )
+
+        val encoded = NullXoidApiJson.encodeToString(StoreActionRequest.serializer(), request)
+
+        assertEquals("guided_multiview", request.model3dInputMode)
+        assertTrue(request.mirrorSideView)
+        assertEquals(3, request.sourceImageViews.size)
+        assertTrue(encoded.contains("sourceImageViews"))
+        assertTrue(encoded.contains("mirrorSideView"))
+        assertTrue(encoded.contains("artifact-left"))
+        assertFalse(encoded.contains("C:\\"))
+        assertFalse(encoded.contains("/sdcard"))
+        assertFalse(encoded.contains("content://"))
     }
 }

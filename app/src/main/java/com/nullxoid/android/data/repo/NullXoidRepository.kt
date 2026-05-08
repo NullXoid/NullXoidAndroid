@@ -29,6 +29,7 @@ import com.nullxoid.android.data.model.StoreActionResponse
 import com.nullxoid.android.data.model.StoreCatalogResponse
 import com.nullxoid.android.data.model.StoreGalleryResponse
 import com.nullxoid.android.data.model.StoreJobsResponse
+import com.nullxoid.android.data.model.StoreSourceImageView
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.Flow
@@ -269,7 +270,10 @@ class NullXoidRepository(
         audioMode: String = "none",
         audioArtifactId: String = "",
         audioPrompt: String = "",
-        sourceImageArtifactId: String = ""
+        sourceImageArtifactId: String = "",
+        sourceImageViews: List<StoreSourceImageView> = emptyList(),
+        model3dInputMode: String = "",
+        mirrorSideView: Boolean = false
     ): StoreActionResponse =
         api.runStoreAction(
             addonId,
@@ -286,6 +290,9 @@ class NullXoidRepository(
                 audioArtifactId = audioArtifactId,
                 audioPrompt = audioPrompt,
                 sourceImageArtifactId = sourceImageArtifactId,
+                sourceImageViews = sourceImageViews,
+                model3dInputMode = model3dInputMode,
+                mirrorSideView = mirrorSideView,
                 waitForApproval = false
             )
         )

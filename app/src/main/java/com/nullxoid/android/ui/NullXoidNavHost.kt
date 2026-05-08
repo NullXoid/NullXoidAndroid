@@ -25,6 +25,7 @@ import com.nullxoid.android.ui.auth.LoginScreen
 import com.nullxoid.android.ui.chat.ChatListScreen
 import com.nullxoid.android.ui.chat.ChatScreen
 import com.nullxoid.android.ui.health.HealthScreen
+import com.nullxoid.android.ui.home.HomeScreen
 import com.nullxoid.android.ui.onboarding.OnboardingScreen
 import com.nullxoid.android.ui.settings.SettingsScreen
 import com.nullxoid.android.ui.store.GalleryScreen
@@ -35,6 +36,7 @@ import com.nullxoid.android.ui.theme.NullXoidTheme
 object Routes {
     const val Onboarding = "onboarding"
     const val Login = "login"
+    const val Home = "home"
     const val ChatList = "chats"
     const val Chat = "chat"
     const val Settings = "settings"
@@ -65,6 +67,13 @@ fun NullXoidApp(
         nav.navigate(Routes.Store) { launchSingleTop = true }
     }
 
+    fun openHome() {
+        nav.navigate(Routes.Home) {
+            launchSingleTop = true
+            popUpTo(Routes.Home) { inclusive = false }
+        }
+    }
+
     LaunchedEffect(Unit) { vm.bootstrap() }
 
     DisposableEffect(lifecycleOwner, state.auth.authenticated) {
@@ -87,7 +96,7 @@ fun NullXoidApp(
     LaunchedEffect(state.auth.authenticated, state.onboardingCompleted) {
         val current = nav.currentBackStackEntry?.destination?.route
         if (state.auth.authenticated && current == Routes.Login) {
-            nav.navigate(if (state.onboardingCompleted) Routes.Store else Routes.Onboarding) {
+            nav.navigate(if (state.onboardingCompleted) Routes.Home else Routes.Onboarding) {
                 popUpTo(Routes.Login) { inclusive = true }
             }
         } else if (!state.auth.authenticated &&
@@ -104,7 +113,7 @@ fun NullXoidApp(
     LaunchedEffect(state.onboardingCompleted, state.auth.authenticated) {
         val current = nav.currentBackStackEntry?.destination?.route
         if (state.onboardingCompleted && current == Routes.Onboarding) {
-            nav.navigate(if (state.auth.authenticated) Routes.Store else Routes.Login) {
+            nav.navigate(if (state.auth.authenticated) Routes.Home else Routes.Login) {
                 popUpTo(Routes.Onboarding) { inclusive = true }
             }
         }
@@ -153,6 +162,7 @@ fun NullXoidApp(
                             nav.navigate(Routes.Chat)
                         },
                         onRefresh = vm::refreshChats,
+                        onOpenHome = { openHome() },
                         onOpenCreate = { openCreate() },
                         onOpenGallery = {
                             vm.refreshStoreGalleries()
@@ -205,6 +215,7 @@ fun NullXoidApp(
                                 popUpTo(0) { inclusive = true }
                             }
                         },
+                        onOpenHome = { openHome() },
                         onOpenCreate = { openCreate() },
                         onOpenAsk = { nav.navigate(Routes.ChatList) { launchSingleTop = true } },
                         onOpenGallery = {
@@ -213,10 +224,46 @@ fun NullXoidApp(
                         }
                     )
                 }
+                composable(Routes.Home) {
+                    LaunchedEffect(state.auth.authenticated) {
+                        if (state.auth.authenticated) {
+                            vm.refreshStore()
+                            vm.refreshStoreGalleries()
+                            vm.refreshStoreJobs(true)
+                            vm.refreshChats()
+                        }
+                    }
+                    HomeScreen(
+                        state = state,
+                        onOpenImage = { openCreate("local-image-studio") },
+                        onOpenVideo = { openCreate("local-video-studio") },
+                        onOpen3d = { openCreate("local-3d-studio") },
+                        onOpenGallery = {
+                            vm.refreshStoreGalleries()
+                            nav.navigate(Routes.Gallery) { launchSingleTop = true }
+                        },
+                        onOpenJobs = {
+                            vm.refreshStoreJobs(false)
+                            nav.navigate(Routes.Jobs) { launchSingleTop = true }
+                        },
+                        onOpenSettings = { nav.navigate(Routes.Settings) { launchSingleTop = true } },
+                        onOpenFullChat = {
+                            if (state.activeChat != null || state.activeMessages.isNotEmpty()) {
+                                nav.navigate(Routes.Chat) { launchSingleTop = true }
+                            } else {
+                                nav.navigate(Routes.ChatList) { launchSingleTop = true }
+                            }
+                        },
+                        onNewChat = vm::startNewChat,
+                        onSendMessage = vm::sendMessage,
+                        onCancelMessage = vm::cancelStream,
+                        onRetryMessage = vm::retryLastMessage
+                    )
+                }
                 composable(Routes.Health) {
                     HealthScreen(
                         state = state,
-                        onBack = { nav.popBackStack() },
+                        onBack = { openHome() },
                         onRefresh = vm::refreshHealth
                     )
                 }
@@ -228,6 +275,7 @@ fun NullXoidApp(
                         state = state,
                         initialAddonId = createInitialAddonId,
                         onRefresh = vm::refreshStore,
+                        onOpenHome = { openHome() },
                         onOpenGallery = {
                             vm.refreshStoreGalleries()
                             nav.navigate(Routes.Gallery)
@@ -256,6 +304,7 @@ fun NullXoidApp(
                         state = state,
                         onRefresh = vm::refreshStoreJobs,
                         onCancelJob = vm::cancelStoreJob,
+                        onOpenHome = { openHome() },
                         onOpenCreate = { openCreate() },
                         onOpenGallery = {
                             vm.refreshStoreGalleries()
@@ -269,6 +318,7 @@ fun NullXoidApp(
                     GalleryScreen(
                         state = state,
                         onRefresh = vm::refreshStoreGalleries,
+                        onOpenHome = { openHome() },
                         onOpenCreate = { openCreate() },
                         onOpenAsk = { nav.navigate(Routes.ChatList) { launchSingleTop = true } },
                         onOpenSettings = { nav.navigate(Routes.Settings) },

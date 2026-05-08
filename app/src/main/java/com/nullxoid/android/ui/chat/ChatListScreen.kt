@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,9 +34,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.nullxoid.android.data.model.ChatRecord
 import com.nullxoid.android.ui.AppUiState
-import com.nullxoid.android.ui.MainBottomNavigation
-import com.nullxoid.android.ui.MainTab
-import com.nullxoid.android.ui.mainTabSwipeNavigation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +42,7 @@ fun ChatListScreen(
     onOpenChat: (ChatRecord) -> Unit,
     onNewChat: () -> Unit,
     onRefresh: () -> Unit,
+    onOpenHome: () -> Unit,
     onOpenCreate: () -> Unit,
     onOpenGallery: () -> Unit,
     onOpenAsk: () -> Unit,
@@ -59,6 +58,9 @@ fun ChatListScreen(
                         Text("Recent conversations", style = MaterialTheme.typography.labelSmall)
                     }
                 },
+                navigationIcon = {
+                    IconButton(onClick = onOpenHome) { Icon(Icons.Default.Home, "Home") }
+                },
                 actions = {
                     IconButton(
                         modifier = Modifier.testTag("chat-list-refresh"),
@@ -69,15 +71,6 @@ fun ChatListScreen(
                         onClick = onOpenHealth
                     ) { Icon(Icons.Default.Favorite, "Backend health") }
                 }
-            )
-        },
-        bottomBar = {
-            MainBottomNavigation(
-                selected = MainTab.Ask,
-                onOpenCreate = onOpenCreate,
-                onOpenGallery = onOpenGallery,
-                onOpenAsk = onOpenAsk,
-                onOpenSettings = onOpenSettings
             )
         },
         floatingActionButton = {
@@ -95,13 +88,6 @@ fun ChatListScreen(
                 .navigationBarsPadding()
                 .imePadding()
                 .fillMaxSize()
-                .mainTabSwipeNavigation(
-                    selected = MainTab.Ask,
-                    onOpenCreate = onOpenCreate,
-                    onOpenGallery = onOpenGallery,
-                    onOpenAsk = onOpenAsk,
-                    onOpenSettings = onOpenSettings
-                )
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()

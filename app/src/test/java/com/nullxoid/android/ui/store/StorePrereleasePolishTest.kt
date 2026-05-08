@@ -29,6 +29,19 @@ class StorePrereleasePolishTest {
     }
 
     @Test
+    fun model3dSourceSlotsKeepFrontRequiredAndLimitToSixUserImages() {
+        val selected = mapOf("front" to "/private/front.png", "left" to "/private/left.png")
+
+        assertEquals(6, model3dSourceImageSlots.size)
+        assertEquals("front", model3dSourceImageSlots.first().role)
+        assertTrue(model3dSourceImageSlots.first().required)
+        assertTrue(model3dPrimarySourceReady(selected))
+        assertTrue(model3dHasOneSideSource(selected))
+        assertEquals(2, model3dSelectedSourceCount(selected))
+        assertFalse(model3dSourceImageSlots.joinToString(" ").contains("/private"))
+    }
+
+    @Test
     fun profileSelectorUsesSafeCatalogValuesWhenPresent() {
         val addon = StoreAddon(
             id = "local-image-studio",
@@ -132,7 +145,8 @@ class StorePrereleasePolishTest {
                   "format": "glb",
                   "status": "ready",
                   "providerStatus": "experimental_beta",
-                  "providerVersion": "general_3d_provider_v0.1",
+                  "providerVersion": "general_3d_provider_v0.1.1",
+                  "runtimeFamily": "portable_comfyui_hunyuan3d",
                   "qualityLabel": "partially_acceptable",
                   "classification": "generated_mesh_texture_only",
                   "assetType": "vehicle",
@@ -146,7 +160,11 @@ class StorePrereleasePolishTest {
                     "bump": false,
                     "height": false,
                     "fakeMapsCreated": false
-                  }
+                  },
+                  "geometryConfidence": "low",
+                  "recommendedFallback": "texture_existing_glb_or_multiview_vehicle_generation",
+                  "fallbackReason": "single_image_vehicle_geometry_low_confidence",
+                  "fallbacks": ["texture_existing_glb", "provide_side_view_source", "provide_multiview_sources"]
                 }
               ]
             }
@@ -156,9 +174,15 @@ class StorePrereleasePolishTest {
         val item = gallery.items.single()
 
         assertTrue(isExperimentalModel3d(item))
+        assertEquals("portable_comfyui_hunyuan3d", item.runtimeFamily)
+        assertEquals("Portable 3D runtime", betaRuntimeFamilyLabel(item))
         assertEquals("Partially acceptable", betaQualityLabel(item))
         assertEquals("Generated mesh + texture-only material", betaClassificationLabel(item))
         assertEquals("Vehicle", betaAssetTypeLabel(item))
+        assertEquals("Low", betaGeometryConfidenceLabel(item))
+        assertEquals("Existing GLB or multiview generation", betaRecommendedFallbackLabel(item))
+        assertEquals("single_image_vehicle_geometry_low_confidence", item.fallbackReason)
+        assertEquals(listOf("texture_existing_glb", "provide_side_view_source", "provide_multiview_sources"), item.fallbacks)
         assertTrue(betaMapAvailabilityLabel(item).contains("albedo"))
         assertTrue(betaMapAvailabilityLabel(item).contains("metallic/roughness"))
         assertEquals(listOf("dominant subject isolated"), item.sourceWarnings)
@@ -182,6 +206,8 @@ class StorePrereleasePolishTest {
         assertEquals("", betaQualityLabel(item))
         assertEquals("", betaClassificationLabel(item))
         assertEquals("", betaAssetTypeLabel(item))
+        assertEquals("", betaGeometryConfidenceLabel(item))
+        assertEquals("", betaRecommendedFallbackLabel(item))
         assertEquals("No generated maps reported", betaMapAvailabilityLabel(item))
     }
 

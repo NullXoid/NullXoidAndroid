@@ -344,6 +344,12 @@ data class StoreCatalogResponse(
 )
 
 @Serializable
+data class StoreSourceImageView(
+    val role: String = "",
+    val artifactId: String = ""
+)
+
+@Serializable
 data class StoreActionRequest(
     val prompt: String,
     val imageSize: String = "1024x1024",
@@ -356,6 +362,9 @@ data class StoreActionRequest(
     val audioArtifactId: String = "",
     val audioPrompt: String = "",
     val sourceImageArtifactId: String = "",
+    val sourceImageViews: List<StoreSourceImageView> = emptyList(),
+    val model3dInputMode: String = "",
+    val mirrorSideView: Boolean = false,
     val waitForApproval: Boolean = false
 )
 
@@ -398,13 +407,18 @@ data class StoreArtifactRef(
     val updatedAt: String = "",
     val providerStatus: String = "",
     val providerVersion: String = "",
+    val runtimeFamily: String = "",
     val qualityLabel: String = "",
     val classification: String = "",
     val assetType: String = "",
     val sourceImagePolicy: String = "",
     val sourceWarnings: List<String> = emptyList(),
     val knownFlaws: List<String> = emptyList(),
-    val mapAvailability: StoreMapAvailability = StoreMapAvailability()
+    val mapAvailability: StoreMapAvailability = StoreMapAvailability(),
+    val geometryConfidence: String = "",
+    val recommendedFallback: String = "",
+    val fallbackReason: String = "",
+    val fallbacks: List<String> = emptyList()
 )
 
 @Serializable

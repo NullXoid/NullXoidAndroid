@@ -18,9 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.viewinterop.AndroidView
-import com.google.android.filament.EntityManager
-import com.google.android.filament.LightManager
-import com.google.android.filament.Skybox
+import com.google.android.filament.Renderer
 import com.google.android.filament.utils.ModelViewer
 import com.google.android.filament.utils.Utils
 import java.nio.ByteBuffer
@@ -55,8 +53,6 @@ private class FilamentGlbView(context: Context) : FrameLayout(context), Choreogr
     private val surfaceView = SurfaceView(context)
     private val choreographer = Choreographer.getInstance()
     private val modelViewer: ModelViewer
-    private var keyLight = 0
-    private var fillLight = 0
     private var currentArtifactId = ""
     private var released = false
     private var frameCallbackPosted = false
@@ -69,25 +65,18 @@ private class FilamentGlbView(context: Context) : FrameLayout(context), Choreogr
         )
         addView(surfaceView)
         modelViewer = ModelViewer(surfaceView)
-        keyLight = EntityManager.get().create()
-        fillLight = EntityManager.get().create()
-        modelViewer.scene.skybox = Skybox.Builder()
-            .color(0.08f, 0.08f, 0.09f, 1.0f)
-            .build(modelViewer.engine)
-        LightManager.Builder(LightManager.Type.DIRECTIONAL)
-            .color(1.0f, 0.95f, 0.86f)
-            .intensity(120_000.0f)
-            .direction(0.25f, -0.65f, -1.0f)
-            .castShadows(false)
-            .build(modelViewer.engine, keyLight)
-        LightManager.Builder(LightManager.Type.DIRECTIONAL)
-            .color(0.66f, 0.76f, 1.0f)
-            .intensity(45_000.0f)
-            .direction(-0.8f, 0.15f, -0.55f)
-            .castShadows(false)
-            .build(modelViewer.engine, fillLight)
-        modelViewer.scene.addEntity(keyLight)
-        modelViewer.scene.addEntity(fillLight)
+        modelViewer.renderer.clearOptions = Renderer.ClearOptions().apply {
+            clear = true
+            clearColor = floatArrayOf(0.08f, 0.08f, 0.09f, 1.0f)
+        }
+        val light = modelViewer.engine.lightManager
+        val lightInstance = light.getInstance(modelViewer.light)
+        if (lightInstance != 0) {
+            light.setColor(lightInstance, 1.0f, 0.95f, 0.86f)
+            light.setIntensity(lightInstance, 160_000.0f)
+            light.setDirection(lightInstance, 0.25f, -0.65f, -1.0f)
+            light.setShadowCaster(lightInstance, false)
+        }
         surfaceView.setOnTouchListener { _, event ->
             modelViewer.onTouchEvent(event)
             true
@@ -113,6 +102,7 @@ private class FilamentGlbView(context: Context) : FrameLayout(context), Choreogr
     override fun onDetachedFromWindow() {
         choreographer.removeFrameCallback(this)
         frameCallbackPosted = false
+        release()
         super.onDetachedFromWindow()
     }
 
@@ -129,13 +119,6 @@ private class FilamentGlbView(context: Context) : FrameLayout(context), Choreogr
         released = true
         choreographer.removeFrameCallback(this)
         frameCallbackPosted = false
-        runCatching { modelViewer.destroyModel() }
-        runCatching { modelViewer.scene.removeEntity(keyLight) }
-        runCatching { modelViewer.scene.removeEntity(fillLight) }
-        runCatching { modelViewer.engine.destroyEntity(keyLight) }
-        runCatching { modelViewer.engine.destroyEntity(fillLight) }
-        runCatching { EntityManager.get().destroy(keyLight) }
-        runCatching { EntityManager.get().destroy(fillLight) }
     }
 
     private fun postFrameCallback() {
