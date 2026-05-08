@@ -28,6 +28,8 @@ import com.nullxoid.android.data.model.StoreActionRequest
 import com.nullxoid.android.data.model.StoreActionResponse
 import com.nullxoid.android.data.model.StoreCatalogResponse
 import com.nullxoid.android.data.model.StoreGalleryResponse
+import com.nullxoid.android.data.model.StoreJobsResponse
+import com.nullxoid.android.data.model.StoreSourceImageView
 import com.nullxoid.android.data.model.StreamEvent
 import com.nullxoid.android.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.Flow
@@ -233,9 +235,19 @@ class NullXoidRepository(
 
     suspend fun storeJob(storeJobId: String): StoreActionResponse = api.storeJob(storeJobId)
 
+    suspend fun storeJobs(activeOnly: Boolean = true, limit: Int = 50): StoreJobsResponse =
+        api.storeJobs(activeOnly, limit)
+
+    suspend fun cancelStoreJob(storeJobId: String): StoreActionResponse = api.cancelStoreJob(storeJobId)
+
     suspend fun storeArtifactBytes(artifactId: String): ByteArray = api.getBytes("/artifacts/$artifactId")
 
     suspend fun uploadStoreAudio(filename: String, mimeType: String, bytes: ByteArray): String {
+        val response = api.uploadArtifact(filename, mimeType, bytes)
+        return response.items.firstOrNull()?.id.orEmpty()
+    }
+
+    suspend fun uploadStoreImage(filename: String, mimeType: String, bytes: ByteArray): String {
         val response = api.uploadArtifact(filename, mimeType, bytes)
         return response.items.firstOrNull()?.id.orEmpty()
     }
@@ -257,7 +269,11 @@ class NullXoidRepository(
         jobType: String = "",
         audioMode: String = "none",
         audioArtifactId: String = "",
-        audioPrompt: String = ""
+        audioPrompt: String = "",
+        sourceImageArtifactId: String = "",
+        sourceImageViews: List<StoreSourceImageView> = emptyList(),
+        model3dInputMode: String = "",
+        mirrorSideView: Boolean = false
     ): StoreActionResponse =
         api.runStoreAction(
             addonId,
@@ -273,6 +289,10 @@ class NullXoidRepository(
                 audioMode = audioMode,
                 audioArtifactId = audioArtifactId,
                 audioPrompt = audioPrompt,
+                sourceImageArtifactId = sourceImageArtifactId,
+                sourceImageViews = sourceImageViews,
+                model3dInputMode = model3dInputMode,
+                mirrorSideView = mirrorSideView,
                 waitForApproval = false
             )
         )

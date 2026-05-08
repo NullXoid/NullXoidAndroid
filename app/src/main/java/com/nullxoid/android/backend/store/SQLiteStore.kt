@@ -161,6 +161,40 @@ class SQLiteStore(context: Context) : SQLiteOpenHelper(
         return readChat(chatId)
     }
 
+    override fun updateChat(
+        chatId: String,
+        workspaceId: String?,
+        projectId: String?,
+        title: String,
+        messages: List<ChatMessage>
+    ): ChatRecord? {
+        val db = writableDatabase
+        val existing = readChat(chatId) ?: return null
+        val now = Instant.now().toString()
+        db.beginTransaction()
+        try {
+            db.update(
+                "chats",
+                ContentValues().apply {
+                    put("title", title.ifBlank { existing.title })
+                    put("workspace_id", workspaceId ?: existing.workspaceId)
+                    put("project_id", projectId ?: existing.projectId)
+                    put("updated_at", now)
+                },
+                "id = ?",
+                arrayOf(chatId)
+            )
+            db.delete("messages", "chat_id = ?", arrayOf(chatId))
+            messages.forEachIndexed { index, message ->
+                db.insertMessage(chatId, index, message)
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        return readChat(chatId)
+    }
+
     override fun archive(chatId: String, archived: Boolean): ChatRecord? {
         val db = writableDatabase
         val existing = readChat(chatId) ?: return null

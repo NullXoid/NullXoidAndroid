@@ -344,6 +344,12 @@ data class StoreCatalogResponse(
 )
 
 @Serializable
+data class StoreSourceImageView(
+    val role: String = "",
+    val artifactId: String = ""
+)
+
+@Serializable
 data class StoreActionRequest(
     val prompt: String,
     val imageSize: String = "1024x1024",
@@ -355,6 +361,10 @@ data class StoreActionRequest(
     val audioMode: String = "none",
     val audioArtifactId: String = "",
     val audioPrompt: String = "",
+    val sourceImageArtifactId: String = "",
+    val sourceImageViews: List<StoreSourceImageView> = emptyList(),
+    val model3dInputMode: String = "",
+    val mirrorSideView: Boolean = false,
     val waitForApproval: Boolean = false
 )
 
@@ -372,6 +382,16 @@ data class UploadArtifactResponse(
 )
 
 @Serializable
+data class StoreMapAvailability(
+    val albedo: Boolean = false,
+    val metallicRoughness: Boolean = false,
+    val normal: Boolean = false,
+    val bump: Boolean = false,
+    val height: Boolean = false,
+    val fakeMapsCreated: Boolean = false
+)
+
+@Serializable
 data class StoreArtifactRef(
     val artifactId: String = "",
     val thumbnailId: String = "",
@@ -384,12 +404,71 @@ data class StoreArtifactRef(
     val durationMs: Int = 0,
     val format: String = "",
     val createdAt: String = "",
-    val updatedAt: String = ""
+    val updatedAt: String = "",
+    val providerStatus: String = "",
+    val providerVersion: String = "",
+    val runtimeFamily: String = "",
+    val qualityLabel: String = "",
+    val classification: String = "",
+    val assetType: String = "",
+    val sourceImagePolicy: String = "",
+    val sourceWarnings: List<String> = emptyList(),
+    val knownFlaws: List<String> = emptyList(),
+    val mapAvailability: StoreMapAvailability = StoreMapAvailability(),
+    val geometryConfidence: String = "",
+    val recommendedFallback: String = "",
+    val fallbackReason: String = "",
+    val fallbacks: List<String> = emptyList()
 )
 
 @Serializable
 data class StoreActionResult(
     val artifacts: List<StoreArtifactRef> = emptyList()
+)
+
+@Serializable
+data class StoreJobEvent(
+    val type: String = "",
+    val at: String = "",
+    val status: String? = null,
+    val errorCode: String? = null
+)
+
+@Serializable
+data class StoreJobSummary(
+    val ok: Boolean = true,
+    val storeJobId: String? = null,
+    val jobId: String? = null,
+    val providerJobId: String? = null,
+    val requestId: String? = null,
+    val addonId: String = "",
+    val mediaKind: String = "",
+    val capability: String = "",
+    val action: String = "",
+    val status: String = "",
+    val approvalRequired: Boolean = false,
+    val approvalSource: String = "",
+    val queueLane: String = "",
+    val queuePosition: Int = 0,
+    val canCancel: Boolean = false,
+    val cancelRequested: Boolean = false,
+    val pollAfterMs: Int = 1500,
+    val errorCode: String? = null,
+    val artifacts: List<StoreArtifactRef> = emptyList(),
+    val createdAt: String = "",
+    val updatedAt: String = "",
+    val startedAt: String = "",
+    val completedAt: String = "",
+    val cancelledAt: String = "",
+    val events: List<StoreJobEvent> = emptyList()
+)
+
+@Serializable
+data class StoreJobsResponse(
+    val ok: Boolean = true,
+    val activeOnly: Boolean = true,
+    val jobs: List<StoreJobSummary> = emptyList(),
+    val pollAfterMs: Int = 1500
 )
 
 @Serializable
@@ -401,8 +480,15 @@ data class StoreActionResponse(
     val requestId: String? = null,
     val addonId: String = "",
     val mediaKind: String = "",
+    val capability: String = "",
+    val action: String = "",
     val status: String = "",
     val approvalRequired: Boolean = false,
+    val approvalSource: String = "",
+    val queueLane: String = "",
+    val queuePosition: Int = 0,
+    val canCancel: Boolean = false,
+    val cancelRequested: Boolean = false,
     val pollAfterMs: Int = 1500,
     val errorCode: String? = null,
     val artifacts: List<StoreArtifactRef> = emptyList(),
@@ -413,7 +499,39 @@ data class StoreActionResponse(
     val durationMs: Int = 0,
     val createdAt: String = "",
     val updatedAt: String = "",
+    val startedAt: String = "",
+    val completedAt: String = "",
+    val cancelledAt: String = "",
+    val events: List<StoreJobEvent> = emptyList(),
     val result: StoreActionResult? = null
+)
+
+fun StoreActionResponse.toStoreJobSummary(): StoreJobSummary = StoreJobSummary(
+    ok = ok,
+    storeJobId = storeJobId,
+    jobId = jobId,
+    providerJobId = providerJobId,
+    requestId = requestId,
+    addonId = addonId,
+    mediaKind = mediaKind,
+    capability = capability,
+    action = action,
+    status = status,
+    approvalRequired = approvalRequired,
+    approvalSource = approvalSource,
+    queueLane = queueLane,
+    queuePosition = queuePosition,
+    canCancel = canCancel,
+    cancelRequested = cancelRequested,
+    pollAfterMs = pollAfterMs,
+    errorCode = errorCode,
+    artifacts = artifacts.ifEmpty { result?.artifacts.orEmpty() },
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    startedAt = startedAt,
+    completedAt = completedAt,
+    cancelledAt = cancelledAt,
+    events = events
 )
 
 @Serializable

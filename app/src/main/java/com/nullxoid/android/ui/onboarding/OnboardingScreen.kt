@@ -47,8 +47,8 @@ internal fun onboardingAccountStatus(authenticated: Boolean, passkeyCount: Int):
 internal fun onboardingUpdateStatus(source: String): String =
     when (SettingsStore.normalizeUpdateSource(source)) {
         SettingsStore.UPDATE_SOURCE_FORGEJO -> "Forgejo only. Use this when testing EchoLabs internal releases."
-        SettingsStore.UPDATE_SOURCE_GITHUB -> "GitHub only. Use this when testing the public mirror."
-        else -> "Auto checks Forgejo first, then GitHub."
+        SettingsStore.UPDATE_SOURCE_GITHUB -> "Public mirror only. Use this only when it is explicitly allowed."
+        else -> "Auto uses EchoLabs Forgejo unless another source is explicitly allowed."
     }
 
 @OptIn(ExperimentalMaterial3Api::class)

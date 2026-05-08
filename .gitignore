@@ -5,5 +5,5 @@ build/
 app/build/
 local.properties
 build.log
+screenshots/
 *.iml
-

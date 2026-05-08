@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
@@ -27,7 +28,10 @@ import com.nullxoid.android.data.model.StoreActionResponse
 import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.data.model.StoreCatalogResponse
 import com.nullxoid.android.data.model.StoreGalleryResponse
+import com.nullxoid.android.data.model.StoreJobSummary
+import com.nullxoid.android.data.model.StoreSourceImageView
 import com.nullxoid.android.data.model.StreamEvent
+import com.nullxoid.android.data.model.toStoreJobSummary
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.data.repo.NullXoidRepository
 import com.nullxoid.android.data.update.AppUpdateChecker
@@ -57,6 +61,7 @@ import java.time.Instant
 private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
 private const val OIDC_REDIRECT_URI = "nullxoid://auth/oidc/callback"
 private val STORE_TERMINAL_STATUSES = setOf("completed", "denied", "expired", "failed", "cancelled")
+private val MODEL3D_SOURCE_IMAGE_ROLES = listOf("front", "left", "right", "back", "top", "reference")
 
 private data class StoreRefreshResult(
     val catalog: StoreCatalogResponse,
@@ -72,6 +77,34 @@ private data class StoreGalleriesRefreshResult(
     val activeJob: StoreActionResponse?,
     val activeJobId: String,
     val activeAddonId: String
+)
+
+private fun jobSummaryToActionResponse(job: StoreJobSummary): StoreActionResponse = StoreActionResponse(
+    ok = job.ok,
+    storeJobId = job.storeJobId,
+    jobId = job.jobId,
+    providerJobId = job.providerJobId,
+    requestId = job.requestId,
+    addonId = job.addonId,
+    mediaKind = job.mediaKind,
+    capability = job.capability,
+    action = job.action,
+    status = job.status,
+    approvalRequired = job.approvalRequired,
+    approvalSource = job.approvalSource,
+    queueLane = job.queueLane,
+    queuePosition = job.queuePosition,
+    canCancel = job.canCancel,
+    cancelRequested = job.cancelRequested,
+    pollAfterMs = job.pollAfterMs,
+    errorCode = job.errorCode,
+    artifacts = job.artifacts,
+    createdAt = job.createdAt,
+    updatedAt = job.updatedAt,
+    startedAt = job.startedAt,
+    completedAt = job.completedAt,
+    cancelledAt = job.cancelledAt,
+    events = job.events
 )
 
 internal fun parseSavedChatRecoveryImport(json: Json, raw: String): JsonObject {
@@ -211,6 +244,9 @@ data class AppUiState(
     val storeGallery: StoreGalleryResponse = StoreGalleryResponse(addonId = "local-image-studio"),
     val storeGalleryAll: List<StoreArtifactRef> = emptyList(),
     val storeAction: StoreActionResponse? = null,
+    val storeJobs: List<StoreJobSummary> = emptyList(),
+    val storeJobsActiveOnly: Boolean = true,
+    val storeJobsLoading: Boolean = false,
     val storeLoading: Boolean = false,
     val activeStoreJobId: String = "",
     val activeStoreAddonId: String = "",
@@ -513,6 +549,7 @@ class NullXoidViewModel(
                     activeStoreJobId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeJobId,
                     activeStoreAddonId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeAddonId
                 )
+                refreshStoreJobsOnce(true)
             }.onFailure { t ->
                 _state.value = _state.value.copy(
                     storeLoading = false,
@@ -529,6 +566,44 @@ class NullXoidViewModel(
                 .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
                 .onFailure { t -> _state.value = _state.value.copy(error = t.message ?: "Gallery refresh failed") }
         }
+    }
+
+    fun refreshStoreJobs(activeOnly: Boolean = true) {
+        viewModelScope.launch { refreshStoreJobsOnce(activeOnly) }
+    }
+
+    private suspend fun refreshStoreJobsOnce(activeOnly: Boolean = true): List<StoreJobSummary> {
+        _state.value = _state.value.copy(storeJobsLoading = true)
+        return runCatching { repo.storeJobs(activeOnly = activeOnly, limit = 50) }
+            .fold(
+                onSuccess = { response ->
+                val jobs = response.jobs
+                val latest = jobs.firstOrNull()
+                    ?: _state.value.activeStoreJobId
+                        .takeIf { it.isNotBlank() }
+                        ?.let { id -> runCatching { repo.storeJob(id).toStoreJobSummary() }.getOrNull() }
+                val active = jobs.firstOrNull { it.status !in STORE_TERMINAL_STATUSES }
+                if (active == null && _state.value.activeStoreJobId.isNotBlank()) {
+                    settingsStore.clearActiveStoreJob()
+                }
+                _state.value = _state.value.copy(
+                    storeJobs = jobs,
+                    storeJobsActiveOnly = activeOnly,
+                    storeJobsLoading = false,
+                    storeAction = latest?.let(::jobSummaryToActionResponse) ?: _state.value.storeAction,
+                    activeStoreJobId = active?.storeJobId ?: active?.jobId ?: "",
+                    activeStoreAddonId = active?.addonId ?: ""
+                )
+                    jobs
+                },
+                onFailure = { t ->
+                _state.value = _state.value.copy(
+                    storeJobsLoading = false,
+                    error = t.message ?: "Job refresh failed"
+                )
+                    emptyList()
+                }
+            )
     }
 
     fun refreshStoreGalleries() {
@@ -563,6 +638,7 @@ class NullXoidViewModel(
                     activeStoreJobId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeJobId,
                     activeStoreAddonId = if (activeJob?.status in STORE_TERMINAL_STATUSES) "" else result.activeAddonId
                 )
+                refreshStoreJobsOnce(false)
             }.onFailure { t ->
                 _state.value = _state.value.copy(
                     storeLoading = false,
@@ -594,7 +670,8 @@ class NullXoidViewModel(
             format = "glb",
             audioMode = "none",
             recordedAudioPath = "",
-            audioPrompt = ""
+            audioPrompt = "",
+            sourceImagePath = ""
         )
     }
 
@@ -609,7 +686,10 @@ class NullXoidViewModel(
         format: String,
         audioMode: String,
         recordedAudioPath: String,
-        audioPrompt: String
+        audioPrompt: String,
+        sourceImagePath: String = "",
+        sourceImagePaths: Map<String, String> = emptyMap(),
+        mirrorSideView: Boolean = false
     ) {
         val cleanPrompt = prompt.trim()
         if (cleanPrompt.isBlank()) {
@@ -621,6 +701,11 @@ class NullXoidViewModel(
         }
         if (cleanAudioMode == "recorded_voice" && recordedAudioPath.isBlank()) {
             _state.value = _state.value.copy(error = "Record a voice clip before generating with recorded voice.")
+            return
+        }
+        val primary3dSourcePath = sourceImagePath.ifBlank { sourceImagePaths["front"].orEmpty() }
+        if (addonId == "local-3d-studio" && primary3dSourcePath.isBlank()) {
+            _state.value = _state.value.copy(error = "Choose a source image before generating a 3D model.")
             return
         }
         viewModelScope.launch {
@@ -643,6 +728,20 @@ class NullXoidViewModel(
                 } else {
                     ""
                 }
+                val sourceImageViews = if (addonId == "local-3d-studio") {
+                    val selected = linkedMapOf<String, String>()
+                    selected["front"] = primary3dSourcePath
+                    MODEL3D_SOURCE_IMAGE_ROLES.forEach { role ->
+                        val path = sourceImagePaths[role].orEmpty()
+                        if (path.isNotBlank()) selected[role] = path
+                    }
+                    selected
+                        .filterValues { it.isNotBlank() }
+                        .map { (role, path) -> uploadStore3dSourceImage(role, path) }
+                } else {
+                    emptyList()
+                }
+                val sourceImageArtifactId = sourceImageViews.firstOrNull { it.role == "front" }?.artifactId.orEmpty()
                 repo.runStoreAction(
                     addonId = addonId,
                     action = action,
@@ -654,7 +753,11 @@ class NullXoidViewModel(
                     jobType = jobType,
                     audioMode = cleanAudioMode,
                     audioArtifactId = audioArtifactId,
-                    audioPrompt = audioPrompt.trim()
+                    audioPrompt = audioPrompt.trim(),
+                    sourceImageArtifactId = sourceImageArtifactId,
+                    sourceImageViews = sourceImageViews,
+                    model3dInputMode = if (sourceImageViews.size > 1) "guided_multiview" else "single_image",
+                    mirrorSideView = mirrorSideView
                 )
             }.onSuccess { result ->
                 val storeJobId = result.storeJobId ?: result.jobId.orEmpty()
@@ -667,11 +770,13 @@ class NullXoidViewModel(
                         activeStoreAddonId = addonId,
                         storeSaveStatus = ""
                     )
+                    refreshStoreJobsOnce(true)
                     startStoreJobPolling(storeJobId, addonId, result.pollAfterMs)
                 } else {
                     _state.value = _state.value.copy(storeLoading = false, storeAction = result)
                     runCatching { repo.storeGallery(addonId) }
                         .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
+                    refreshStoreJobsOnce(true)
                 }
             }.onFailure { t ->
                 _state.value = _state.value.copy(
@@ -681,6 +786,25 @@ class NullXoidViewModel(
                 )
             }
         }
+    }
+
+    private suspend fun uploadStore3dSourceImage(role: String, path: String): StoreSourceImageView {
+        val cleanRole = role.trim().lowercase().replace("-", "_")
+        require(cleanRole in MODEL3D_SOURCE_IMAGE_ROLES) { "Unsupported 3D source image role." }
+        val imageFile = File(path)
+        require(imageFile.exists() && imageFile.length() > 0L) {
+            "Choose a source image before generating a 3D model."
+        }
+        val bytes = withContext(Dispatchers.IO) { imageFile.readBytes() }
+        val extension = imageFile.extension.lowercase().ifBlank { "png" }
+        val mimeType = when (extension) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "webp" -> "image/webp"
+            else -> "image/png"
+        }
+        val uploaded = repo.uploadStoreImage("source-image-$cleanRole.$extension", mimeType, bytes)
+        require(uploaded.isNotBlank()) { "Source image upload failed." }
+        return StoreSourceImageView(role = cleanRole, artifactId = uploaded)
     }
 
     private fun resumeActiveStoreJob() {
@@ -693,11 +817,30 @@ class NullXoidViewModel(
 
     fun resumeStoreJobPolling() {
         viewModelScope.launch {
+            val jobs = refreshStoreJobsOnce(true)
+            if (jobs.any { it.status !in STORE_TERMINAL_STATUSES }) {
+                startStoreJobsPolling()
+                return@launch
+            }
             val jobId = _state.value.activeStoreJobId.ifBlank { settingsStore.activeStoreJobId.first() }
             val addonId = _state.value.activeStoreAddonId.ifBlank { settingsStore.activeStoreAddonId.first() }
             if (jobId.isNotBlank() && addonId.isNotBlank()) {
                 _state.value = _state.value.copy(activeStoreJobId = jobId, activeStoreAddonId = addonId)
                 startStoreJobPolling(jobId, addonId)
+            }
+        }
+    }
+
+    private fun startStoreJobsPolling(initialPollAfterMs: Int = 1500) {
+        storePollJob?.cancel()
+        storePollJob = viewModelScope.launch {
+            var pollAfterMs = initialPollAfterMs.coerceAtLeast(500)
+            while (true) {
+                delay(pollAfterMs.toLong())
+                val jobs = refreshStoreJobsOnce(true)
+                val active = jobs.filter { it.status !in STORE_TERMINAL_STATUSES }
+                pollAfterMs = active.firstOrNull()?.pollAfterMs?.coerceAtLeast(500) ?: 1500
+                if (active.isEmpty()) break
             }
         }
     }
@@ -718,6 +861,7 @@ class NullXoidViewModel(
                     activeStoreJobId = storeJobId,
                     activeStoreAddonId = addonId
                 )
+                refreshStoreJobsOnce(true)
                 pollAfterMs = result.pollAfterMs.coerceAtLeast(500)
                 if (result.status in STORE_TERMINAL_STATUSES) {
                     runCatching { repo.storeGallery(addonId) }
@@ -727,6 +871,33 @@ class NullXoidViewModel(
                     break
                 }
             }
+        }
+    }
+
+    fun cancelStoreJob(storeJobId: String) {
+        if (storeJobId.isBlank()) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(storeJobsLoading = true, error = null)
+            runCatching { repo.cancelStoreJob(storeJobId) }
+                .onSuccess { cancelled ->
+                    _state.value = _state.value.copy(
+                        storeAction = cancelled,
+                        storeLoading = false,
+                        storeJobsLoading = false,
+                        activeStoreJobId = if (cancelled.status in STORE_TERMINAL_STATUSES) "" else storeJobId,
+                        activeStoreAddonId = if (cancelled.status in STORE_TERMINAL_STATUSES) "" else cancelled.addonId
+                    )
+                    if (cancelled.status in STORE_TERMINAL_STATUSES) settingsStore.clearActiveStoreJob()
+                    refreshStoreJobsOnce(false)
+                    runCatching { repo.storeGallery(cancelled.addonId.ifBlank { _state.value.storeGallery.addonId }) }
+                        .onSuccess { gallery -> _state.value = _state.value.copy(storeGallery = gallery) }
+                }
+                .onFailure { t ->
+                    _state.value = _state.value.copy(
+                        storeJobsLoading = false,
+                        error = t.message ?: "Cancel job failed"
+                    )
+                }
         }
     }
 
@@ -841,18 +1012,41 @@ class NullXoidViewModel(
 
     private suspend fun saveMediaBytesToDevice(artifactId: String, mimeType: String, bytes: ByteArray): Uri =
         withContext(Dispatchers.IO) {
+            val isModel = mimeType.startsWith("model/")
             val isVideo = mimeType.startsWith("video/")
             val extension = when {
+                mimeType == "model/gltf+json" -> "gltf"
+                isModel -> "glb"
                 mimeType == "video/webm" -> "webm"
                 mimeType.startsWith("video/") -> "mp4"
                 mimeType == "image/jpeg" -> "jpg"
                 else -> "png"
             }
-            val collection = if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-            val relativePath = if (isVideo) Environment.DIRECTORY_MOVIES + "/EchoLabs" else Environment.DIRECTORY_PICTURES + "/EchoLabs"
+            if (isModel && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                error("Saving GLB files requires Android 10 or newer. Use Share to export the model file.")
+            }
+            val collection = when {
+                isModel -> MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                isVideo -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                else -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
+            val relativePath = when {
+                isModel -> Environment.DIRECTORY_DOWNLOADS + "/EchoLabs"
+                isVideo -> Environment.DIRECTORY_MOVIES + "/EchoLabs"
+                else -> Environment.DIRECTORY_PICTURES + "/EchoLabs"
+            }
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, "echolabs-$artifactId.$extension")
-                put(MediaStore.MediaColumns.MIME_TYPE, mimeType.ifBlank { if (isVideo) "video/mp4" else "image/png" })
+                put(
+                    MediaStore.MediaColumns.MIME_TYPE,
+                    mimeType.ifBlank {
+                        when {
+                            isModel -> "model/gltf-binary"
+                            isVideo -> "video/mp4"
+                            else -> "image/png"
+                        }
+                    }
+                )
                 put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
             }
             val resolver = appContext.contentResolver
@@ -1063,13 +1257,6 @@ class NullXoidViewModel(
         if (_state.value.streaming) return
         val model = _state.value.selectedModel ?: run {
             _state.value = _state.value.copy(error = "Select a model first")
-            return
-        }
-        if (!repo.hasSharedSavedChatKey()) {
-            _state.value = _state.value.copy(
-                error = "Import the shared saved-chat E2EE key in Settings before sending synced encrypted chats.",
-                lastFailedPrompt = trimmed
-            )
             return
         }
         val userMsg = ChatMessage(role = "user", content = trimmed, createdAt = nowIsoTimestamp())

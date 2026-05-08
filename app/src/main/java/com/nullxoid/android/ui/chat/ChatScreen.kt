@@ -146,7 +146,7 @@ fun ChatScreen(
                 Column(Modifier.padding(12.dp)) {
                     state.error?.let {
                         Text(
-                            it,
+                            friendlyChatError(it),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -338,6 +338,7 @@ private fun MessageBubble(
     onClick: () -> Unit
 ) {
     val isUser = msg.role.equals("user", ignoreCase = true)
+    val roleTag = msg.role.lowercase()
     val bg = if (isUser) MaterialTheme.colorScheme.primary
              else MaterialTheme.colorScheme.surfaceVariant
     val fg = if (isUser) MaterialTheme.colorScheme.onPrimary
@@ -350,7 +351,9 @@ private fun MessageBubble(
             color = bg,
             shape = RoundedCornerShape(16.dp),
             tonalElevation = 0.dp,
-            modifier = Modifier.clickable(onClick = onClick)
+            modifier = Modifier
+                .testTag("chat-message-$roleTag")
+                .clickable(onClick = onClick)
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Text(
@@ -359,7 +362,12 @@ private fun MessageBubble(
                     style = MaterialTheme.typography.labelSmall
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(msg.content, color = fg, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = msg.content,
+                    modifier = Modifier.testTag("chat-message-content-$roleTag"),
+                    color = fg,
+                    style = MaterialTheme.typography.bodyMedium
+                )
                 formatMessageTiming(
                     createdAt = msg.createdAt,
                     previousUserCreatedAt = previousUserCreatedAt

@@ -27,7 +27,7 @@ class OnboardingUxTest {
     fun updateStepExplainsAutoMirrorOrder() {
         val message = onboardingUpdateStatus(SettingsStore.UPDATE_SOURCE_AUTO)
 
-        assertTrue(message.contains("Forgejo first"))
-        assertTrue(message.contains("GitHub"))
+        assertTrue(message.contains("Forgejo"))
+        assertTrue(message.contains("explicitly allowed"))
     }
 }

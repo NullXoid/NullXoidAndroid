@@ -28,6 +28,56 @@ data class StoreProfileOption(
     val format: String
 )
 
+data class Model3DSourceImageSlot(
+    val role: String,
+    val label: String,
+    val helper: String,
+    val required: Boolean = false
+)
+
+val model3dSourceImageSlots = listOf(
+    Model3DSourceImageSlot(
+        role = "front",
+        label = "Front / main",
+        helper = "Start here with one clear cutout image.",
+        required = true
+    ),
+    Model3DSourceImageSlot(
+        role = "left",
+        label = "Side",
+        helper = "Helps wide objects, vehicles, tools, and shoes."
+    ),
+    Model3DSourceImageSlot(
+        role = "right",
+        label = "Other side",
+        helper = "Optional. A matching opposite side is best."
+    ),
+    Model3DSourceImageSlot(
+        role = "back",
+        label = "Back",
+        helper = "Optional. Improves backs, tails, handles, and details."
+    ),
+    Model3DSourceImageSlot(
+        role = "top",
+        label = "Top / detail",
+        helper = "Optional. Useful for products, furniture, and props."
+    ),
+    Model3DSourceImageSlot(
+        role = "reference",
+        label = "Texture reference",
+        helper = "Optional color/material reference."
+    )
+)
+
+fun model3dSelectedSourceCount(paths: Map<String, String>): Int =
+    model3dSourceImageSlots.count { slot -> !paths[slot.role].isNullOrBlank() }
+
+fun model3dPrimarySourceReady(paths: Map<String, String>): Boolean =
+    !paths["front"].isNullOrBlank()
+
+fun model3dHasOneSideSource(paths: Map<String, String>): Boolean =
+    !paths["left"].isNullOrBlank() xor !paths["right"].isNullOrBlank()
+
 data class FriendlyStoreStatus(
     val label: String,
     val helper: String,
@@ -64,7 +114,7 @@ fun mediaOptions(addons: List<StoreAddon>, selectedAddonId: String): List<StoreM
             mediaKind = "3d",
             label = "3D",
             addonId = MODEL3D_ADDON_ID,
-            description = "Prepare a GLB/glTF model card.",
+            description = "Generate an experimental beta GLB/glTF model.",
             selected = selectedAddonId == MODEL3D_ADDON_ID
         )
     ).filter { available.containsKey(it.addonId) }
@@ -101,8 +151,8 @@ fun profileOptions(addon: StoreAddon?): List<StoreProfileOption> {
         MODEL3D_ADDON_ID -> listOf(
             StoreProfileOption(
                 id = "model3d-glb-draft",
-                label = "GLB draft/model card",
-                description = "Draft 3D artifact metadata using GLB/glTF terminology.",
+                label = "Beta GLB draft",
+                description = "Experimental source-image to GLB generation with safe beta reporting.",
                 imageSize = "1024x1024",
                 videoSize = "1024x1024",
                 durationMs = 0,
@@ -184,7 +234,7 @@ fun friendlyStoreStatus(status: String?, errorCode: String? = null): FriendlySto
 fun safeArtifactTitle(item: StoreArtifactRef, index: Int): String {
     val kind = when {
         item.mimeType.startsWith("video/") -> "Video"
-        item.mimeType.startsWith("model/") || item.format in setOf("glb", "gltf") -> "3D model"
+        isModelArtifact(item) -> "3D model"
         else -> "Image"
     }
     return "$kind ${index + 1}"
@@ -193,11 +243,79 @@ fun safeArtifactTitle(item: StoreArtifactRef, index: Int): String {
 fun artifactTypeLabel(item: StoreArtifactRef): String =
     when {
         item.mimeType.startsWith("video/") -> "Video"
-        item.mimeType.startsWith("model/") || item.format in setOf("glb", "gltf") ->
+        isModelArtifact(item) ->
             "3D ${item.format.ifBlank { "GLB" }.uppercase()}"
         item.mimeType.startsWith("image/") -> "Image"
         else -> item.mimeType.ifBlank { "Media" }
     }
+
+fun isModelArtifact(item: StoreArtifactRef): Boolean =
+    item.mimeType.startsWith("model/") || item.format.lowercase() in setOf("glb", "gltf")
+
+fun isExperimentalModel3d(item: StoreArtifactRef): Boolean =
+    isModelArtifact(item) && item.providerStatus == "experimental_beta"
+
+fun betaQualityLabel(item: StoreArtifactRef): String =
+    when (item.qualityLabel) {
+        "acceptable" -> "Acceptable"
+        "partially_acceptable" -> "Partially acceptable"
+        "flawed" -> "Flawed"
+        "failed" -> "Failed"
+        "unknown" -> "Unknown"
+        else -> ""
+    }
+
+fun betaClassificationLabel(item: StoreArtifactRef): String =
+    when (item.classification) {
+        "generated_mesh_texture_only" -> "Generated mesh + texture-only material"
+        "existing_mesh_uv_wrapped_texture_only" -> "Existing mesh + UV-wrapped texture-only material"
+        "real_displacement_geometry" -> "Real displacement geometry"
+        "unknown" -> "Unknown"
+        else -> ""
+    }
+
+fun betaAssetTypeLabel(item: StoreArtifactRef): String =
+    item.assetType
+        .takeIf { it.isNotBlank() }
+        ?.replace('_', ' ')
+        ?.replaceFirstChar { it.uppercase() }
+        .orEmpty()
+
+fun betaRuntimeFamilyLabel(item: StoreArtifactRef): String =
+    when (item.runtimeFamily) {
+        "portable_" + "com" + "fyui_hunyuan3d" -> "Portable 3D runtime"
+        else -> ""
+    }
+
+fun betaGeometryConfidenceLabel(item: StoreArtifactRef): String =
+    when (item.geometryConfidence) {
+        "low" -> "Low"
+        "medium" -> "Medium"
+        "high" -> "High"
+        "unknown" -> "Unknown"
+        else -> ""
+    }
+
+fun betaRecommendedFallbackLabel(item: StoreArtifactRef): String =
+    when (item.recommendedFallback) {
+        "texture_existing_glb" -> "Texture existing GLB"
+        "provide_side_view_source" -> "Provide side-view source"
+        "provide_multiview_sources" -> "Provide multiview sources"
+        "texture_existing_glb_or_multiview_vehicle_generation" -> "Existing GLB or multiview generation"
+        "unknown" -> "Unknown"
+        else -> ""
+    }
+
+fun betaMapAvailabilityLabel(item: StoreArtifactRef): String {
+    val maps = buildList {
+        if (item.mapAvailability.albedo) add("albedo")
+        if (item.mapAvailability.metallicRoughness) add("metallic/roughness")
+        if (item.mapAvailability.normal) add("normal")
+        if (item.mapAvailability.bump) add("bump")
+        if (item.mapAvailability.height) add("height")
+    }
+    return if (maps.isEmpty()) "No generated maps reported" else maps.joinToString(", ")
+}
 
 fun safePreviewPath(item: StoreArtifactRef): String =
     listOf(item.thumbnailUrl, item.posterUrl, item.previewUrl, item.modelPreviewUrl)

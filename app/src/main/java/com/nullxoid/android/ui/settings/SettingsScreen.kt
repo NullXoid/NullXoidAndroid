@@ -26,6 +26,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,11 +47,8 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.nullxoid.android.data.prefs.SettingsStore
 import com.nullxoid.android.ui.AppUiState
-import com.nullxoid.android.ui.MainBottomNavigation
-import com.nullxoid.android.ui.MainTab
 import com.nullxoid.android.ui.qr.NullXoidQrCaptureActivity
 import com.nullxoid.android.ui.availableUpdateSources
-import com.nullxoid.android.ui.mainTabSwipeNavigation
 import com.nullxoid.android.ui.passkeyEnrollmentStatusText
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,6 +71,7 @@ fun SettingsScreen(
     onImportSavedChatRecovery: (String, String) -> Unit,
     onRunOnboarding: () -> Unit,
     onLogout: () -> Unit,
+    onOpenHome: () -> Unit,
     onOpenCreate: () -> Unit,
     onOpenAsk: () -> Unit,
     onOpenGallery: () -> Unit
@@ -113,16 +115,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") }
-            )
-        },
-        bottomBar = {
-            MainBottomNavigation(
-                selected = MainTab.Settings,
-                onOpenCreate = onOpenCreate,
-                onOpenGallery = onOpenGallery,
-                onOpenAsk = onOpenAsk,
-                onOpenSettings = {}
+                title = { Text("Settings") },
+                navigationIcon = {
+                    IconButton(onClick = onOpenHome) { Icon(Icons.Default.Home, "Home") }
+                }
             )
         }
     ) { inner ->
@@ -132,13 +128,6 @@ fun SettingsScreen(
                 .padding(20.dp)
                 .navigationBarsPadding()
                 .imePadding()
-                .mainTabSwipeNavigation(
-                    selected = MainTab.Settings,
-                    onOpenCreate = onOpenCreate,
-                    onOpenGallery = onOpenGallery,
-                    onOpenAsk = onOpenAsk,
-                    onOpenSettings = {}
-                )
                 .verticalScroll(rememberScrollState())
                 .fillMaxSize()
         ) {
@@ -424,8 +413,8 @@ fun SettingsScreen(
             Text(
                 when (state.updateSource) {
                     SettingsStore.UPDATE_SOURCE_FORGEJO -> "Use EchoLabs Forgejo releases only."
-                    SettingsStore.UPDATE_SOURCE_GITHUB -> "Use the public GitHub mirror only."
-                    else -> "Try EchoLabs Forgejo first, then GitHub mirror."
+                    SettingsStore.UPDATE_SOURCE_GITHUB -> "Use the public mirror only when explicitly allowed."
+                    else -> "Use EchoLabs Forgejo unless another source is explicitly allowed."
                 },
                 style = MaterialTheme.typography.bodySmall
             )
@@ -506,6 +495,7 @@ fun SettingsScreen(
                             "Running on 127.0.0.1:8090 - $selectedProviderName provider"
                         else
                             "Use a remote NullXoid backend via the Base URL below",
+                        modifier = Modifier.testTag("settings-embedded-status"),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }

@@ -26,11 +26,11 @@ android {
         .getOrElse("http://git.echolabs.diy/EchoLabs/NullXoidAndroid/releases")
     val appUpdateFallbackReleasesUrl = providers.gradleProperty("NULLXOID_APP_UPDATE_FALLBACK_RELEASES_URL")
         .orElse(providers.environmentVariable("NULLXOID_APP_UPDATE_FALLBACK_RELEASES_URL"))
-        .getOrElse("https://api.github.com/repos/NullXoid/NullXoidAndroid/releases")
+        .getOrElse("")
     val appUpdateFallbackReleasePageBase =
         providers.gradleProperty("NULLXOID_APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE")
             .orElse(providers.environmentVariable("NULLXOID_APP_UPDATE_FALLBACK_RELEASE_PAGE_BASE"))
-            .getOrElse("https://github.com/NullXoid/NullXoidAndroid/releases")
+            .getOrElse("")
 
     val updateSigningStoreFile = providers.gradleProperty("NULLXOID_SIGNING_STORE_FILE")
         .orElse(providers.environmentVariable("NULLXOID_SIGNING_STORE_FILE"))
@@ -69,10 +69,10 @@ android {
         versionCode = providers.gradleProperty("APP_VERSION_CODE")
             .orElse(providers.environmentVariable("APP_VERSION_CODE"))
             .map(String::toInt)
-            .getOrElse(90)
+            .getOrElse(92)
         versionName = providers.gradleProperty("APP_VERSION_NAME")
             .orElse(providers.environmentVariable("APP_VERSION_NAME"))
-            .getOrElse("0.1.90")
+            .getOrElse("0.1.92")
     }
 
     buildFeatures {
@@ -157,6 +157,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    val filament = "1.71.0"
+    implementation("com.google.android.filament:filament-android:$filament")
+    implementation("com.google.android.filament:gltfio-android:$filament")
+    implementation("com.google.android.filament:filament-utils-android:$filament")
 
     // Embedded on-device backend (Ktor CIO server)
     val ktor = "2.3.12"

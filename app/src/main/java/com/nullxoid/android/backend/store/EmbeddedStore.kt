@@ -15,6 +15,13 @@ interface EmbeddedStore {
         title: String,
         messages: List<ChatMessage>
     ): ChatRecord
+    fun updateChat(
+        chatId: String,
+        workspaceId: String?,
+        projectId: String?,
+        title: String,
+        messages: List<ChatMessage>
+    ): ChatRecord?
     fun appendAssistantMessage(chatId: String, assistantText: String): ChatRecord?
     fun archive(chatId: String, archived: Boolean): ChatRecord?
 }

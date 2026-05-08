@@ -9,10 +9,12 @@ import android.media.MediaDataSource
 import android.media.MediaMetadataRetriever
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.net.Uri
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -34,6 +36,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -50,6 +53,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -79,9 +83,6 @@ import androidx.core.content.FileProvider
 import com.nullxoid.android.data.model.StoreAddon
 import com.nullxoid.android.data.model.StoreArtifactRef
 import com.nullxoid.android.ui.AppUiState
-import com.nullxoid.android.ui.MainBottomNavigation
-import com.nullxoid.android.ui.MainTab
-import com.nullxoid.android.ui.mainTabSwipeNavigation
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -91,11 +92,13 @@ fun StoreScreen(
     state: AppUiState,
     initialAddonId: String,
     onRefresh: () -> Unit,
+    onOpenHome: () -> Unit,
     onOpenGallery: () -> Unit,
+    onOpenJobs: () -> Unit,
     onOpenAsk: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectAddon: (String) -> Unit,
-    onRunStoreAddon: (String, String, String, String, String, String, Int, String, String, String, String) -> Unit,
+    onRunStoreAddon: (String, String, String, String, String, String, Int, String, String, String, String, String, Map<String, String>, Boolean) -> Unit,
     onSaveArtifact: (String, String) -> Unit,
     onShareArtifact: (String, String) -> Unit,
     onViewArtifact: (StoreArtifactRef) -> Unit,
@@ -119,9 +122,11 @@ fun StoreScreen(
             selectedAddonId = initialAddonId
         }
     }
-    LaunchedEffect(state.activeStoreAddonId, addons.size) {
-        val active = state.activeStoreAddonId.takeIf { id -> addons.any { it.id == id } }
-        if (!active.isNullOrBlank()) selectedAddonId = active
+    LaunchedEffect(state.activeStoreAddonId, addons.size, initialAddonId) {
+        if (initialAddonId.isBlank()) {
+            val active = state.activeStoreAddonId.takeIf { id -> addons.any { it.id == id } }
+            if (!active.isNullOrBlank()) selectedAddonId = active
+        }
     }
     val selectedAddon = addons.firstOrNull { it.id == selectedAddonId } ?: addons.firstOrNull()
     LaunchedEffect(selectedAddon?.id) {
@@ -152,6 +157,10 @@ fun StoreScreen(
     }
     var audioPrompt by remember(selectedAddon?.id) { mutableStateOf("") }
     var recordedAudioPath by remember(selectedAddon?.id) { mutableStateOf("") }
+    var sourceImagePaths by remember(selectedAddon?.id) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var sourceImageStatus by remember(selectedAddon?.id) { mutableStateOf("") }
+    var mirrorSideView by remember(selectedAddon?.id) { mutableStateOf(false) }
+    var pendingSourceImageRole by remember(selectedAddon?.id) { mutableStateOf("front") }
     var recorder by remember { mutableStateOf<WavVoiceRecorder?>(null) }
     var recording by remember { mutableStateOf(false) }
     var audioStatus by remember(selectedAddon?.id) { mutableStateOf("") }
@@ -170,26 +179,39 @@ fun StoreScreen(
             audioStatus = "Microphone permission denied."
         }
     }
+    val sourceImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) {
+            sourceImageStatus = "No source image selected."
+        } else {
+            runCatching {
+                val role = pendingSourceImageRole.takeIf { candidate ->
+                    model3dSourceImageSlots.any { it.role == candidate }
+                } ?: "front"
+                sourceImagePaths = sourceImagePaths + (role to copySourceImageFor3d(context, uri, role))
+                val label = model3dSourceImageSlots.firstOrNull { it.role == role }?.label ?: "Image"
+                sourceImageStatus = "$label ready"
+            }.onFailure {
+                sourceImagePaths = sourceImagePaths - pendingSourceImageRole
+                sourceImageStatus = "Source image could not be loaded."
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Create") },
+                navigationIcon = {
+                    IconButton(onClick = onOpenHome) { Icon(Icons.Default.Home, "Home") }
+                },
                 actions = {
                     IconButton(
                         modifier = Modifier.testTag("store-refresh"),
                         onClick = onRefresh
                     ) { Icon(Icons.Default.Refresh, "Refresh Create") }
                 }
-            )
-        },
-        bottomBar = {
-            MainBottomNavigation(
-                selected = MainTab.Create,
-                onOpenCreate = {},
-                onOpenGallery = onOpenGallery,
-                onOpenAsk = onOpenAsk,
-                onOpenSettings = onOpenSettings
             )
         }
     ) { inner ->
@@ -199,44 +221,28 @@ fun StoreScreen(
                 .navigationBarsPadding()
                 .imePadding()
                 .fillMaxSize()
-                .mainTabSwipeNavigation(
-                    selected = MainTab.Create,
-                    onOpenCreate = {},
-                    onOpenGallery = onOpenGallery,
-                    onOpenAsk = onOpenAsk,
-                    onOpenSettings = onOpenSettings
-                )
                 .testTag("store-screen"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item(key = "store-header") {
-                Text(
-                    "Create",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    "Private media through approval-gated workflows.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            item(key = "store-header-${selectedAddon?.id.orEmpty()}") {
+                CreateStudioHeader(
+                    mediaKind = mediaKind,
+                    addons = addons,
+                    selectedAddonId = selectedAddon?.id.orEmpty(),
+                    latestResultReady = latestRenderableArtifact(state.storeGallery.items) != null,
+                    onSelect = { option ->
+                        selectedAddonId = option.addonId
+                        selectedProfileId = ""
+                        onSelectAddon(option.addonId)
+                    },
+                    onOpenGallery = onOpenGallery
                 )
             }
 
             if (addons.isEmpty()) {
                 item(key = "store-empty") { EmptyStoreCard(state.storeLoading) }
             } else {
-                item(key = "store-media-selector") {
-                    StoreMediaSelector(
-                        addons = addons,
-                        selectedAddonId = selectedAddon?.id.orEmpty(),
-                        onSelect = { option ->
-                            selectedAddonId = option.addonId
-                            selectedProfileId = ""
-                            onSelectAddon(option.addonId)
-                        }
-                    )
-                }
                 item(key = "store-addon-panel-${selectedAddon?.id.orEmpty()}") {
                     StoreAddonPanel(
                         addon = selectedAddon,
@@ -254,8 +260,20 @@ fun StoreScreen(
                         recordedAudioPath = recordedAudioPath,
                         recording = recording,
                         audioStatus = audioStatus,
+                        sourceImagePaths = sourceImagePaths,
+                        sourceImageStatus = sourceImageStatus,
+                        mirrorSideView = mirrorSideView,
                         onAudioModeChange = { audioMode = it },
                         onAudioPromptChange = { audioPrompt = it },
+                        onPickSourceImage = { role ->
+                            pendingSourceImageRole = role
+                            sourceImageLauncher.launch("image/*")
+                        },
+                        onClearSourceImage = { role ->
+                            sourceImagePaths = sourceImagePaths - role
+                            sourceImageStatus = ""
+                        },
+                        onMirrorSideViewChange = { mirrorSideView = it },
                         onStartRecording = {
                             if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                                 android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -296,7 +314,10 @@ fun StoreScreen(
                                     selectedProfile?.format.orEmpty(),
                                     if (mediaKind == "video") audioMode else "none",
                                     recordedAudioPath,
-                                    audioPrompt.ifBlank { "Generate synchronized audio that matches the video prompt." }
+                                    audioPrompt.ifBlank { "Generate synchronized audio that matches the video prompt." },
+                                    if (mediaKind == "3d") sourceImagePaths["front"].orEmpty() else "",
+                                    if (mediaKind == "3d") sourceImagePaths else emptyMap(),
+                                    if (mediaKind == "3d") mirrorSideView && model3dHasOneSideSource(sourceImagePaths) else false
                                 )
                             }
                         }
@@ -345,6 +366,7 @@ fun StoreScreen(
         StoreMediaViewer(
             artifact = artifact,
             bytes = state.storeViewerBytes,
+            previewBytes = state.storePreviewBytes[artifact.artifactId] ?: ByteArray(0),
             loading = state.storeViewerLoading,
             error = state.storeViewerError,
             onClose = onCloseViewer,
@@ -352,6 +374,24 @@ fun StoreScreen(
             onShare = { onShareArtifact(artifact.artifactId, artifact.mimeType) }
         )
     }
+}
+
+private fun selectedWorkflowLabel(mediaKind: String): String = when (mediaKind) {
+    "video" -> "Video selected"
+    "3d" -> "3D Beta selected"
+    else -> "Image selected"
+}
+
+private fun studioTitle(mediaKind: String): String = when (mediaKind) {
+    "video" -> "Video Studio"
+    "3d" -> "3D Beta Studio"
+    else -> "Image Studio"
+}
+
+private fun studioDescription(mediaKind: String): String = when (mediaKind) {
+    "video" -> "Create a private motion clip. Use a prompt or start from an image when available."
+    "3d" -> "Generate private GLB/glTF model artifacts from an image."
+    else -> "Generate private images through an approval-gated workflow."
 }
 
 private fun startVoiceRecording(
@@ -524,39 +564,107 @@ private fun EmptyStoreCard(loading: Boolean) {
 }
 
 @Composable
+private fun CreateStudioHeader(
+    mediaKind: String,
+    addons: List<StoreAddon>,
+    selectedAddonId: String,
+    latestResultReady: Boolean,
+    onSelect: (StoreMediaOption) -> Unit,
+    onOpenGallery: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            studioTitle(mediaKind),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            studioDescription(mediaKind),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        StoreMediaSelector(
+            addons = addons,
+            selectedAddonId = selectedAddonId,
+            onSelect = onSelect
+        )
+        if (latestResultReady) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Latest result ready",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    TextButton(onClick = onOpenGallery) { Text("Open Gallery") }
+                }
+            }
+        }
+        if (mediaKind == "3d") {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0xFFFFF3D6),
+                border = BorderStroke(1.dp, Color(0xFFE1B95C))
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(
+                        "3D is experimental",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF8A5B00)
+                    )
+                    Text(
+                        "Image-to-3D works. Mesh and wrapping quality may vary.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF6B4C11)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun StoreMediaSelector(
     addons: List<StoreAddon>,
     selectedAddonId: String,
     onSelect: (StoreMediaOption) -> Unit
 ) {
     val options = mediaOptions(addons, selectedAddonId)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { option ->
-            ElevatedCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("store-media-${option.mediaKind}"),
-                onClick = { onSelect(option) }
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(option.label, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            option.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+            FilterChip(
+                modifier = Modifier.testTag("store-media-${option.mediaKind}"),
+                selected = option.selected,
+                onClick = { onSelect(option) },
+                label = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(option.label)
+                        if (option.mediaKind == "3d") {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.88f)
+                            ) {
+                                Text(
+                                    "Beta",
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
                     }
-                    AssistChip(
-                        onClick = { onSelect(option) },
-                        label = { Text(if (option.selected) "Selected" else "Choose") }
-                    )
                 }
-            }
+            )
         }
     }
 }
@@ -575,124 +683,436 @@ private fun StoreAddonPanel(
     recordedAudioPath: String,
     recording: Boolean,
     audioStatus: String,
+    sourceImagePaths: Map<String, String>,
+    sourceImageStatus: String,
+    mirrorSideView: Boolean,
     onSelectProfile: (String) -> Unit,
     onPromptChange: (String) -> Unit,
     onSizeChange: (String) -> Unit,
     onAudioModeChange: (String) -> Unit,
     onAudioPromptChange: (String) -> Unit,
+    onPickSourceImage: (String) -> Unit,
+    onClearSourceImage: (String) -> Unit,
+    onMirrorSideViewChange: (Boolean) -> Unit,
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
     onRun: () -> Unit
 ) {
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("store-${addon?.id ?: "addon"}-detail")
+            .testTag("store-${addon?.id ?: "addon"}-detail"),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        when (mediaKind) {
+            "video" -> VideoStudioContent(
+                profiles = profiles,
+                selectedProfileId = selectedProfileId,
+                prompt = prompt,
+                audioMode = audioMode,
+                audioPrompt = audioPrompt,
+                recordedAudioPath = recordedAudioPath,
+                recording = recording,
+                audioStatus = audioStatus,
+                onSelectProfile = onSelectProfile,
+                onPromptChange = onPromptChange,
+                onAudioModeChange = onAudioModeChange,
+                onAudioPromptChange = onAudioPromptChange,
+                onStartRecording = onStartRecording,
+                onStopRecording = onStopRecording
+            )
+            "3d" -> Model3DStudioContent(
+                profiles = profiles,
+                selectedProfileId = selectedProfileId,
+                prompt = prompt,
+                sourceImagePaths = sourceImagePaths,
+                sourceImageStatus = sourceImageStatus,
+                mirrorSideView = mirrorSideView,
+                onSelectProfile = onSelectProfile,
+                onPromptChange = onPromptChange,
+                onPickSourceImage = onPickSourceImage,
+                onClearSourceImage = onClearSourceImage,
+                onMirrorSideViewChange = onMirrorSideViewChange
+            )
+            else -> ImageStudioContent(
+                profiles = profiles,
+                selectedProfileId = selectedProfileId,
+                prompt = prompt,
+                sizeDraft = sizeDraft,
+                onSelectProfile = onSelectProfile,
+                onPromptChange = onPromptChange,
+                onSizeChange = onSizeChange
+            )
+        }
+        val missingRecordedAudio = mediaKind == "video" &&
+            audioMode == "recorded_voice" &&
+            recordedAudioPath.isBlank()
+        val missingSourceImage = mediaKind == "3d" && !model3dPrimarySourceReady(sourceImagePaths)
+        Button(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .testTag("store-${addon?.id ?: "addon"}-generate"),
+            enabled = !loading && addon != null && !recording && !missingRecordedAudio && !missingSourceImage,
+            onClick = onRun
         ) {
             Text(
-                when (mediaKind) {
-                    "video" -> "Video"
-                    "3d" -> "3D"
-                    else -> "Image"
-                },
-                style = MaterialTheme.typography.headlineSmall
+                when {
+                    loading -> "Checking job..."
+                    missingRecordedAudio -> "Record voice first"
+                    missingSourceImage -> "Choose source image first"
+                    mediaKind == "video" -> "Create video"
+                    mediaKind == "3d" -> "Create 3D model"
+                    else -> "Create image"
+                }
             )
-            Text(
-                "Creative Workflows",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(addon?.name ?: "Creative Workflow", style = MaterialTheme.typography.titleSmall)
-            Text(
-                addon?.description.orEmpty(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text("Job type", style = MaterialTheme.typography.titleSmall)
-            profiles.forEach { profile ->
-                FilterChip(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("store-job-type-${profile.id}"),
-                    selected = profile.id == selectedProfileId,
-                    onClick = { onSelectProfile(profile.id) },
-                    label = {
-                        Column(Modifier.padding(vertical = 4.dp)) {
-                            Text(profile.label)
-                            if (profile.description.isNotBlank()) {
-                                Text(
-                                    profile.description,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                )
-            }
-            OutlinedTextField(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("store-prompt"),
-                value = prompt,
-                onValueChange = onPromptChange,
-                label = { Text("Prompt") },
-                minLines = 3
-            )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = sizeDraft,
-                onValueChange = onSizeChange,
-                label = { Text(if (mediaKind == "video") "Video size" else "Image size") },
-                singleLine = true
-            )
-            val selectedProfile = profiles.firstOrNull { it.id == selectedProfileId }
+        }
+    }
+}
+
+@Composable
+private fun ImageStudioContent(
+    profiles: List<StoreProfileOption>,
+    selectedProfileId: String,
+    prompt: String,
+    sizeDraft: String,
+    onSelectProfile: (String) -> Unit,
+    onPromptChange: (String) -> Unit,
+    onSizeChange: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        StudioSectionTitle("Prompt")
+        OutlinedTextField(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("store-prompt"),
+            value = prompt,
+            onValueChange = onPromptChange,
+            placeholder = { Text("Describe the picture you want to create...") },
+            minLines = 4
+        )
+        Text(
+            "Tip: include subject, setting, style, lighting, and mood.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        StudioSectionTitle("Job type")
+        CompactProfileChips(
+            profiles = profiles,
+            selectedProfileId = selectedProfileId,
+            onSelectProfile = onSelectProfile
+        )
+        StudioSectionTitle("Output")
+        ImageOutputChips(sizeDraft = sizeDraft, onSizeChange = onSizeChange)
+        AdvancedSettingsRow("Advanced settings")
+    }
+}
+
+@Composable
+private fun VideoStudioContent(
+    profiles: List<StoreProfileOption>,
+    selectedProfileId: String,
+    prompt: String,
+    audioMode: String,
+    audioPrompt: String,
+    recordedAudioPath: String,
+    recording: Boolean,
+    audioStatus: String,
+    onSelectProfile: (String) -> Unit,
+    onPromptChange: (String) -> Unit,
+    onAudioModeChange: (String) -> Unit,
+    onAudioPromptChange: (String) -> Unit,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        StudioSectionTitle("Prompt")
+        OutlinedTextField(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("store-prompt"),
+            value = prompt,
+            onValueChange = onPromptChange,
+            placeholder = { Text("Describe the motion, camera movement, subject, and mood...") },
+            minLines = 4
+        )
+        Text(
+            "Tip: keep video prompts short and specific.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        StudioSectionTitle("Job type")
+        CompactProfileChips(
+            profiles = profiles,
+            selectedProfileId = selectedProfileId,
+            onSelectProfile = onSelectProfile
+        )
+        VideoAudioOptions(
+            audioMode = audioMode,
+            audioPrompt = audioPrompt,
+            recordedAudioPath = recordedAudioPath,
+            recording = recording,
+            status = audioStatus,
+            onAudioModeChange = onAudioModeChange,
+            onAudioPromptChange = onAudioPromptChange,
+            onStartRecording = onStartRecording,
+            onStopRecording = onStopRecording
+        )
+        StudioInfoRow(
+            title = "Approval required",
+            helper = "Video jobs stay queued until the workflow is approved."
+        )
+    }
+}
+
+@Composable
+private fun Model3DStudioContent(
+    profiles: List<StoreProfileOption>,
+    selectedProfileId: String,
+    prompt: String,
+    sourceImagePaths: Map<String, String>,
+    sourceImageStatus: String,
+    mirrorSideView: Boolean,
+    onSelectProfile: (String) -> Unit,
+    onPromptChange: (String) -> Unit,
+    onPickSourceImage: (String) -> Unit,
+    onClearSourceImage: (String) -> Unit,
+    onMirrorSideViewChange: (Boolean) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Model3DSourceImageOptions(
+            sourceImagePaths = sourceImagePaths,
+            status = sourceImageStatus,
+            mirrorSideView = mirrorSideView,
+            onPickSourceImage = onPickSourceImage,
+            onClearSourceImage = onClearSourceImage,
+            onMirrorSideViewChange = onMirrorSideViewChange
+        )
+        StudioSectionTitle("Prompt")
+        OutlinedTextField(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("store-prompt"),
+            value = prompt,
+            onValueChange = onPromptChange,
+            placeholder = { Text("Optional: describe the object, material, or shape...") },
+            minLines = 3
+        )
+        StudioSectionTitle("Job type")
+        CompactProfileChips(
+            profiles = profiles,
+            selectedProfileId = selectedProfileId,
+            onSelectProfile = onSelectProfile
+        )
+        AdvancedSettingsRow("Advanced mesh settings")
+    }
+}
+
+@Composable
+private fun StudioSectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+}
+
+@Composable
+private fun CompactProfileChips(
+    profiles: List<StoreProfileOption>,
+    selectedProfileId: String,
+    onSelectProfile: (String) -> Unit
+) {
+    if (profiles.isEmpty()) {
+        Text(
+            "No job types available.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        profiles.chunked(2).forEach { rowProfiles ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (mediaKind == "video") {
-                    AssistChip(
-                        onClick = {},
-                        label = { Text("${((selectedProfile?.durationMs ?: 0) / 1000).coerceAtLeast(1)} seconds") }
+                rowProfiles.forEach { profile ->
+                    FilterChip(
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("store-job-type-${profile.id}"),
+                        selected = profile.id == selectedProfileId,
+                        onClick = { onSelectProfile(profile.id) },
+                        label = {
+                            Text(
+                                profile.label,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     )
                 }
-                if (mediaKind == "3d") {
-                    AssistChip(
-                        onClick = {},
-                        label = { Text("Format: ${(selectedProfile?.format ?: "glb").uppercase()}") }
-                    )
+                if (rowProfiles.size == 1) {
+                    Spacer(Modifier.weight(1f))
                 }
-                AssistChip(onClick = {}, label = { Text("Approval required") })
-            }
-            if (mediaKind == "video") {
-                VideoAudioOptions(
-                    audioMode = audioMode,
-                    audioPrompt = audioPrompt,
-                    recordedAudioPath = recordedAudioPath,
-                    recording = recording,
-                    status = audioStatus,
-                    onAudioModeChange = onAudioModeChange,
-                    onAudioPromptChange = onAudioPromptChange,
-                    onStartRecording = onStartRecording,
-                    onStopRecording = onStopRecording
-                )
-            }
-            val missingRecordedAudio = mediaKind == "video" &&
-                audioMode == "recorded_voice" &&
-                recordedAudioPath.isBlank()
-            Button(
-                modifier = Modifier
-                    .height(52.dp)
-                    .testTag("store-${addon?.id ?: "addon"}-generate"),
-                enabled = !loading && addon != null && !recording && !missingRecordedAudio,
-                onClick = onRun
-            ) {
-                Text(if (loading) "Checking job..." else "Generate with approval")
             }
         }
     }
+}
+
+@Composable
+private fun ImageOutputChips(sizeDraft: String, onSizeChange: (String) -> Unit) {
+    val outputs = listOf(
+        "1024x1024" to "Square",
+        "768x1024" to "Portrait",
+        "1344x768" to "Landscape"
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        outputs.forEach { (size, label) ->
+            FilterChip(
+                selected = sizeDraft == size,
+                onClick = { onSizeChange(size) },
+                label = { Text(label) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun StudioInfoRow(title: String, helper: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text(helper, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun AdvancedSettingsRow(label: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+
+@Composable
+private fun Model3DSourceImageOptions(
+    sourceImagePaths: Map<String, String>,
+    status: String,
+    mirrorSideView: Boolean,
+    onPickSourceImage: (String) -> Unit,
+    onClearSourceImage: (String) -> Unit,
+    onMirrorSideViewChange: (Boolean) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("3D source images", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Start with one clear image. Add side or back views when you have them. Mesh and wrapping are still experimental.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            "${model3dSelectedSourceCount(sourceImagePaths)} of ${model3dSourceImageSlots.size} images selected",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        model3dSourceImageSlots.forEach { slot ->
+            val ready = !sourceImagePaths[slot.role].isNullOrBlank()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        slot.label + if (slot.required) " *" else "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (slot.required) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                    Text(
+                        if (ready) "Ready" else slot.helper,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                OutlinedButton(
+                    modifier = Modifier.testTag("store-3d-source-${slot.role}"),
+                    onClick = { onPickSourceImage(slot.role) }
+                ) {
+                    Text(if (ready) "Change" else "Choose")
+                }
+                if (ready) {
+                    IconButton(
+                        modifier = Modifier.testTag("store-3d-source-${slot.role}-clear"),
+                        onClick = { onClearSourceImage(slot.role) }
+                    ) {
+                        Icon(Icons.Default.Close, "Clear ${slot.label}")
+                    }
+                }
+            }
+        }
+        val hasOneSide = model3dHasOneSideSource(sourceImagePaths)
+        FilterChip(
+            selected = mirrorSideView,
+            enabled = hasOneSide,
+            onClick = { onMirrorSideViewChange(!mirrorSideView) },
+            label = {
+                Text(
+                    if (hasOneSide) {
+                        "Mirror one side for the opposite side"
+                    } else {
+                        "Add one side image to enable side mirroring"
+                    }
+                )
+            }
+        )
+        val readyText = status.ifBlank {
+            if (model3dPrimarySourceReady(sourceImagePaths)) {
+                "Ready for approval-gated GLB generation"
+            } else {
+                "Choose the front / main image first"
+            }
+        }
+        Text(
+            readyText,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+
+private fun copySourceImageFor3d(context: Context, uri: Uri, role: String): String {
+    val mimeType = context.contentResolver.getType(uri).orEmpty().lowercase()
+    val extension = when (mimeType) {
+        "image/jpeg" -> "jpg"
+        "image/webp" -> "webp"
+        else -> "png"
+    }
+    val safeRole = role.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.ifBlank { "source" }
+    val targetDir = File(context.filesDir, "store_3d_source_images").apply { mkdirs() }
+    targetDir.listFiles()
+        ?.filter { it.name.startsWith("source-image-$safeRole.") }
+        ?.forEach { old -> runCatching { old.delete() } }
+    val target = File(targetDir, "source-image-$safeRole.${System.currentTimeMillis()}.$extension")
+    context.contentResolver.openInputStream(uri).use { input ->
+        requireNotNull(input) { "Source image could not be opened." }
+        target.outputStream().use { output -> input.copyTo(output) }
+    }
+    require(target.length() > 0L) { "Source image is empty." }
+    return target.absolutePath
 }
 
 @Composable
@@ -841,6 +1261,9 @@ fun StoreGalleryCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = {}, label = { Text(artifactTypeLabel(item)) })
                 AssistChip(onClick = {}, label = { Text(item.status.ifBlank { "ready" }) })
+                if (isExperimentalModel3d(item)) {
+                    AssistChip(onClick = {}, label = { Text("Beta") })
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(enabled = actionsEnabled, onClick = onView) { Text("View") }
@@ -858,6 +1281,40 @@ fun StoreGalleryCard(
                 }
                 if (item.format.isNotBlank()) {
                     Text("Format: ${item.format}", style = MaterialTheme.typography.labelSmall)
+                }
+                if (isExperimentalModel3d(item)) {
+                    val quality = betaQualityLabel(item)
+                    val classification = betaClassificationLabel(item)
+                    val assetType = betaAssetTypeLabel(item)
+                    val runtimeFamily = betaRuntimeFamilyLabel(item)
+                    val geometryConfidence = betaGeometryConfidenceLabel(item)
+                    val recommendedFallback = betaRecommendedFallbackLabel(item)
+                    Text("3D provider: Experimental beta", style = MaterialTheme.typography.labelSmall)
+                    if (runtimeFamily.isNotBlank()) {
+                        Text("Runtime: $runtimeFamily", style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (quality.isNotBlank()) {
+                        Text("Quality: $quality", style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (classification.isNotBlank()) {
+                        Text("Type: $classification", style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (assetType.isNotBlank()) {
+                        Text("Asset: $assetType", style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (geometryConfidence.isNotBlank()) {
+                        Text("Geometry confidence: $geometryConfidence", style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (recommendedFallback.isNotBlank()) {
+                        Text("Fallback: $recommendedFallback", style = MaterialTheme.typography.labelSmall)
+                    }
+                    Text("Maps: ${betaMapAvailabilityLabel(item)}", style = MaterialTheme.typography.labelSmall)
+                    item.sourceWarnings.take(3).forEach { warning ->
+                        Text("Source warning: $warning", style = MaterialTheme.typography.labelSmall)
+                    }
+                    item.knownFlaws.take(3).forEach { flaw ->
+                        Text("Known limit: $flaw", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
         }
@@ -930,6 +1387,7 @@ private class ByteArrayVideoDataSource(
 fun StoreMediaViewer(
     artifact: StoreArtifactRef,
     bytes: ByteArray,
+    previewBytes: ByteArray,
     loading: Boolean,
     error: String,
     onClose: () -> Unit,
@@ -974,6 +1432,23 @@ fun StoreMediaViewer(
                             )
                         artifact.mimeType.startsWith("video/") ->
                             Text("Video is ready. Save or Share to open it with a player.", color = Color.White)
+                        isModelArtifact(artifact) && bytes.isNotEmpty() ->
+                            InteractiveGlbViewer(
+                                artifactId = artifact.artifactId,
+                                bytes = bytes,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        (artifact.mimeType.startsWith("model/") || artifact.format in setOf("glb", "gltf")) &&
+                            previewBytes.isNotEmpty() ->
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                ZoomableImage(previewBytes)
+                                Text("Rendered GLB preview. Save the GLB to open the model file.", color = Color.White)
+                            }
+                        artifact.mimeType.startsWith("model/") || artifact.format in setOf("glb", "gltf") ->
+                            Text("3D preview not yet available. Save the GLB to open it in a model viewer.", color = Color.White)
                         else -> Text("Preview is not available yet.", color = Color.White)
                     }
                 }
